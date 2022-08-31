@@ -1,3 +1,4 @@
+docker build -t keks51-centos7 -f Dockerfile .
 1) http://localhost:8000/admin/settings
     ADCM's URL: http://{docke-container-host}:8000
 

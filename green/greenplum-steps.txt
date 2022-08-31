@@ -1,3 +1,5 @@
+docker build -t keks51-green -f Dockerfile .
+
 1) add /etc/sysctl.conf
 # kernel.shmall = _PHYS_PAGES / 2 # See Shared Memory Pages
 kernel.shmall = 197951838

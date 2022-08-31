@@ -1,7 +1,7 @@
 version: '2'
 services:
   mdw:
-    image: keks-green
+    image: keks51-green
     container_name: mdw
     hostname: mdw
     privileged: true
@@ -12,21 +12,21 @@ services:
     volumes:
       - ./volume/mdw/:/data/
   sdw1:
-    image: keks-green
+    image: keks51-green
     container_name: sdw1
     hostname: sdw1
     privileged: true
     volumes:
       - ./volume/sdw1/:/data/
   sdw2:
-    image: keks-green
+    image: keks51-green
     container_name: sdw2
     hostname: sdw2
     privileged: true
     volumes:
       - ./volume/sdw2/:/data/
   sdw3:
-    image: keks-green
+    image: keks51-green
     container_name: sdw3
     hostname: sdw3
     privileged: true
