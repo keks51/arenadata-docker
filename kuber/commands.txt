@@ -34,5 +34,5 @@ kubectl delete deploy ch2-depl
 
 eval $(minikube -p minikube docker-env)
 
-docker build -t keks-centos7 -f Dockerfile .
+docker build -t keks51-centos7 -f Dockerfile .
 

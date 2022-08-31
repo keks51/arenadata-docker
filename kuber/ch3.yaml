@@ -14,7 +14,7 @@ spec:
     spec:
       hostname: ch3-host
       containers:
-        - image: keks-centos7
+        - image: keks51-centos7
           imagePullPolicy: Never
           securityContext:
             privileged: true

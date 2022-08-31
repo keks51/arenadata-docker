@@ -89,4 +89,4 @@ RUN mkdir -p /data/primary && \
 #CMD ["/usr/sbin/init && systemctl start sshd && systemctl start crond && systemctl restart systemd-logind && sysctl -p && su gpadmin -s /home/gpadmin/init_ssh.sh"]
 ENTRYPOINT ["/usr/sbin/init"]
 
-# docker build -t keks-green -f Dockerfile .
+# docker build -t keks51-green -f Dockerfile .

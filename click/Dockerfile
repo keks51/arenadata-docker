@@ -50,3 +50,5 @@ RUN mkdir /home/pos/.ssh/ && \
 RUN bash -c 'echo "pos ALL=(ALL:ALL) NOPASSWD: ALL" | (EDITOR="tee -a" visudo)'
 
 CMD ["/usr/sbin/init"]
+
+# docker build -t keks51-centos7 -f Dockerfile .
