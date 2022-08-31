@@ -1,0 +1,120 @@
+(default) bash-5.1# pwd
+/adcm/data/bundle/4c0dc0164d1c64fe6a966f551cd69c0b74ddd282/ansible/roles/adqmdb/tasks
+(default) bash-5.1# cat jdbc_bridge_check.yml
+---
+- include_vars: component_ports.yml
+
+- include_role:
+    name: utils
+    tasks_from: check_port
+  loop: "{{ roles_adqmdb_vars_component_ports  | json_query('jdbc_bridge.*[]') }}"
+  loop_control:
+    loop_var: roles_jdbc_bridge_check_item
+  vars:
+    roles_utils_check_port_args:
+      service_name: "ADQMDB"
+      component: "JDBC Bridge"
+      port: "{{ roles_jdbc_bridge_check_item }}"
+
+- block:
+
+    - name: "Test request to clickhouse via jdbc bridge"
+      command: clickhouse-client -q "select * from jdbc('self_server', 'select 1')"
+      register: roles_jdbc_bridge_main_check
+      until: roles_jdbc_bridge_main_check is succeeded
+      retries: 5
+      delay: 10
+
+  always:
+
+    - include_role:
+        name: adcm
+        tasks_from: check
+      vars:
+        intermediate_result: "{{ roles_jdbc_bridge_main_check.rc == 0 }}"
+        roles_adcm_check_args:
+          service_name: "ADQMDB"
+          component: "JDBC Bridge"
+          title: "Test request to Clickhouse '{{ roles_jdbc_bridge_main_check.cmd }}'"
+          result: "{{ intermediate_result }}"
+          msg: |
+            {% if intermediate_result %}
+            Test request "{{ roles_jdbc_bridge_main_check.cmd }}" completed successfully.
+            {% else %}
+            Test request "{{ roles_jdbc_bridge_main_check.cmd }}" is failed.
+            {% endif %}
+
+            stdout:
+
+            {{ roles_jdbc_bridge_main_check.stdout }}
+
+            stderr:
+
+            {{ roles_jdbc_bridge_main_check.stderr }}
+(default) bash-5.1#
+
+
+
+
+DROP TABLE IF EXISTS default.table;
+
+CREATE TABLE default.table (
+    `one_column` String,
+    nested_column Nested (
+        `my.subcolumn` UInt8
+    )
+)
+ENGINE = ReplacingMergeTree()
+ORDER BY (one_column);
+
+INSERT INTO default.table
+VALUES ('Arthur', [1]), ('Beatrice', [2, 3]);
+
+select * from default.table;
+
+
+systemctl start clickhouse-jdbc-bridge
+/etc/rc.d/init.d/clickhouse-jdbc-bridge start
+
+/etc/clickhouse-jdbc-bridge/datasources.properties
+cat /etc/clickhouse-server/config.xml
+
+/etc/clickhouse-jdbc-bridge/config/datasources
+
+
+mkdir /somewhere
+mount --bind /somewhere /var/lib/docker
+
+groupadd docker
+
+mount --cgroup /sys/fs/cgroup
+
+systemctl status docker.service
+
+
+
+(default) bash-5.1# cat /adcm/data/bundle/d855d7b7c705d0115e080d11c071e167e1395f8c/monitoring/roles/docker_common/tasks/main.yaml
+---
+- name: Install Ansible Dependencies for Docker
+  tags: [install]
+  package:
+    name: "{{ packages_list[ansible_os_family|lower+ansible_distribution_major_version] }}"
+    state: present
+  register: result
+  retries: 3
+  until: result is succeeded
+
+- name: Include spec OS version vars
+  include_vars: "{{ ansible_os_family  | lower + ansible_distribution_major_version | lower }}.yaml"
+  tags: [install]
+
+
+/adcm/data/bundle/ab03856627b573b8d93e072d62ed44d00dc73e09/adb/roles/adb_common/tasks/install.yaml
+- name: Add a line
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for host in result.hosts %}
+      {{ host.address }} {{ host.aliases | join(' ') }}
+      {% endfor %}
+  when: services.adb.config.Advanced.edit_hosts

@@ -1,0 +1,9 @@
+[Unit]
+Description=My Shell Script
+
+[Service]
+ExecStart=/init_script.sh
+Environment=SEGMENTS=$SEGMENTS
+
+[Install]
+WantedBy=multi-user.target

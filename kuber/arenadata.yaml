@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adcm-depl
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adcm
+  template:
+    metadata:
+      labels:
+        app: adcm
+    spec:
+      hostname: adcm
+      containers:
+        - image: arenadata/adcm:latest
+#          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          name: adcm
+          ports:
+            - containerPort: 8000
+            - containerPort: 22
+              name: ssh-port
+          volumeMounts:
+            - name: arenadata-storage
+              mountPath: "/adcm/data"
+      volumes:
+        - name: arenadata-storage
+          hostPath:
+            path: "/Users/Aleksei_Gomziakov/IdeaProjects/arenadata-clickhouse/kuber/volume/adcm"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adcm
+spec:
+  selector:
+    app: adcm
+  type: LoadBalancer
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: adcm-ui
+      nodePort: 30000
+    - name: ssh-port
+      port: 22
+      protocol: TCP
+      targetPort: ssh-port

@@ -1,0 +1,25 @@
+version: '2'
+services:
+  adcm:
+    image: arenadata/adcm:latest
+    ports:
+      - "8000:8000"
+    container_name: adcm
+    hostname: adcm
+    volumes:
+      - ./volume/adcm:/adcm/data
+  ch1:
+    image: keks-centos7
+    container_name: ch1
+    hostname: ch1
+    privileged: true
+  ch2:
+    image: keks-centos7
+    container_name: ch2
+    hostname: ch2
+    privileged: true
+  ch3:
+    image: keks-centos7
+    container_name: ch3
+    hostname: ch3
+    privileged: true

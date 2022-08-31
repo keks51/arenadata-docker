@@ -1,0 +1,34 @@
+version: '2'
+services:
+  mdw:
+    image: keks-green
+    container_name: mdw
+    hostname: mdw
+    privileged: true
+    environment:
+      - CONF__SEGMENTS=sdw1,sdw2,sdw3
+      - CONF__MASTER_HOSTNAME=mdw
+      - CONF__MASTER_PORT=5432
+    volumes:
+      - ./volume/mdw/:/data/
+  sdw1:
+    image: keks-green
+    container_name: sdw1
+    hostname: sdw1
+    privileged: true
+    volumes:
+      - ./volume/sdw1/:/data/
+  sdw2:
+    image: keks-green
+    container_name: sdw2
+    hostname: sdw2
+    privileged: true
+    volumes:
+      - ./volume/sdw2/:/data/
+  sdw3:
+    image: keks-green
+    container_name: sdw3
+    hostname: sdw3
+    privileged: true
+    volumes:
+      - ./volume/sdw3/:/data/

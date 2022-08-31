@@ -1,0 +1,117 @@
+1) add /etc/sysctl.conf
+# kernel.shmall = _PHYS_PAGES / 2 # See Shared Memory Pages
+kernel.shmall = 197951838
+# kernel.shmmax = kernel.shmall * PAGE_SIZE
+kernel.shmmax = 810810728448
+kernel.shmmni = 4096
+vm.overcommit_memory = 2 # See Segment Host Memory
+vm.overcommit_ratio = 95 # See Segment Host Memory
+
+net.ipv4.ip_local_port_range = 10000 65535 # See Port Settings
+kernel.sem = 250 2048000 200 8192
+kernel.sysrq = 1
+kernel.core_uses_pid = 1
+kernel.msgmnb = 65536
+kernel.msgmax = 65536
+kernel.msgmni = 2048
+net.ipv4.tcp_syncookies = 1
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.conf.all.arp_filter = 1
+net.core.netdev_max_backlog = 10000
+net.core.rmem_max = 2097152
+net.core.wmem_max = 2097152
+vm.swappiness = 10
+vm.zone_reclaim_mode = 0
+vm.dirty_expire_centisecs = 500
+vm.dirty_writeback_centisecs = 100
+vm.dirty_background_ratio = 0 # See System Memory
+vm.dirty_ratio = 0
+# vm.dirty_background_bytes = 1610612736
+# vm.dirty_bytes = 4294967296
+vm.dirty_background_ratio = 3
+vm.dirty_ratio = 10
+kernel.core_pattern=/var/core/core.%h.%t
+
+2) add to /etc/security/limits.conf
+* soft nofile 524288
+* hard nofile 524288
+* soft nproc 131072
+* hard nproc 131072
+* soft  core unlimited
+
+3) modify vim /etc/security/limits.d/20-nproc.conf
+* soft nproc 131072
+
+4) sysctl -p
+
+5) chmod +x /etc/rc.d/rc.local
+
+6) /etc/systemd/logind.conf
+uncomment  RemoveIPC=no
+
+7) systemctl restart systemd-logind
+
+8)  add group "gpadmin"
+groupadd gpadmin
+useradd gpadmin -r -m -g gpadmin
+passwd gpadmin
+
+9) su gpadmin
+
+10) ssh-keygen in dockerfile for gpadmin
+
+11) visudo uncomment
+%wheel        ALL=(ALL)       NOPASSWD: ALL
+
+12) usermod -aG wheel gpadmin
+
+13) change pos to admin
+
+14) sudo yum install greenplum-db-6.12.2-RHEL.rpm
+
+15) load from github https://github.com/greenplum-db/gpdb/releases to /home/gpadmin
+
+16) yum install open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm
+
+17)
+sudo chown -R gpadmin:gpadmin /usr/local/greenplum*
+sudo chgrp -R gpadmin /usr/local/greenplum*
+
+Master
+1)
+mkdir -p /data/master
+chown gpadmin:gpadmin /data/master
+
+2)
+mkdir /home/gpadmin/gpconfigs/
+chown -R gpadmin:gpadmin /home/gpadmin/gpconfigs/
+cp $GPHOME/docs/cli_help/gpconfigs/gpinitsystem_config  /home/gpadmin/gpconfigs/gpinitsystem_config
+change declare -a DATA_DIRECTORY=(/data1/primary /data1/primary /data1/primary /data2/primary /data2/primary /data2/primary)
+with declare -a DATA_DIRECTORY=(/data1/primary)
+
+3)
+touch /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+echo $'sdw1\nsdw2\nsdw3'> /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+
+4)
+su gpadmin
+source /usr/local/greenplum-db-6.21.2/greenplum_path.sh
+gpinitsystem -a -c /home/gpadmin/gpconfigs/gpinitsystem_config -h /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+
+systemctl status init_script
+journalctl -u init_script
+
+
+createdb -h mdw -p 5432 gpadmin
+
+gpstart -a
+gpstop -a
+
+select * from pg_catalog.gp_segment_configuration;
+CREATE TABLE test (id int, rank int, count int ) DISTRIBUTED BY (id, rank);
+
+create table test_quota(id int, descr text) distributed by (id);
+insert into test_quota select generate_series(1,3000000) AS id, md5(random()::text) AS descr;
+
+select gp_segment_id, count(*) from test_quota group by gp_segment_id;

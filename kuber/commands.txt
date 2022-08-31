@@ -1,0 +1,38 @@
+minikube start --driver=hyperkit \
+   --mount --mount-string="/Users/Aleksei_Gomziakov/IdeaProjects/arenadata-clickhouse/kuber/volume/:/Users/Aleksei_Gomziakov/IdeaProjects/arenadata-clickhouse/kuber/volume"  \
+   --cpus 4 \
+   --memory 10000 \
+   --disk-size 40000mb
+
+minikube stop
+minikube delete
+
+kubectl apply -f volume.yaml
+kubectl apply -f arenadata.yaml
+
+Follow the following steps to add DNS into minkube
+
+minikube ssh
+sudo vi /etc/systemd/network/10-eth1.network
+add
+DNS=8.8.8.8
+under [Network]
+sudo vi /etc/systemd/network/20-dhcp.network
+add
+DNS=8.8.8.8
+under [Network]
+sudo systemctl restart systemd-networkd
+To test it execute something that has to resolve using dns, like curl google.com or docker pull
+
+
+kubectl delete service adcm
+kubectl delete deploy adcm-depl
+kubectl apply -f arenadata.yaml
+
+kubectl delete service ch2-serv
+kubectl delete deploy ch2-depl
+
+eval $(minikube -p minikube docker-env)
+
+docker build -t keks-centos7 -f Dockerfile .
+
