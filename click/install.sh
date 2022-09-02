@@ -3,21 +3,24 @@
 ADCM_ADDRESS="http://localhost:8000"
 ADCM_ID=1
 ADCM_SETTINGS_FILE=adcmconfig.json
+BUNDLE_NAME_SSH_COMMON="SSH Common"
+HOSTPROVIDER_NAME="HostProvider0"
+HOSTS=["ch1","ch2","ch3"]
 
 #####################
 # Prepare containers and get access token
 #####################
 
-#echo "stopping ADCM ..."
-#docker compose stop
-#docker compose rm -f
-#echo "ADCM stopped"
+echo "stopping ADCM ..."
+docker compose stop
+docker compose rm -f
+echo "ADCM stopped"
 
-#echo "Building node images..."
-#docker build -t keks51-centos7 -f Dockerfile .
-#echo "ADCM node images ready"
+echo "Building node images..."
+docker build -t keks51-centos7 -f Dockerfile .
+echo "ADCM node images ready"
 
-#docker compose up -d
+docker compose up -d
 
 echo "Gettting auth. token"
 echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
@@ -27,7 +30,7 @@ do
 		--header "Accept:application/json" \
 	 	-X POST \
 	 	--data '{"username":"'$ADCM_USERNAME'","password":"'$ADCM_PASSWORD'"}' \
-	 	$ADCM_ADDRESS/api/v1/rbac/token/ \
+	 	"$ADCM_ADDRESS/api/v1/rbac/token/" \
 	 	| jq -r ".token")
 	if [[ -n "$token" && "$token" != "null" ]]; then
 		break
@@ -50,7 +53,7 @@ curl --silent \
 	--header "Authorization: Token $token" \
 	-X POST \
 	--data "@$ADCM_SETTINGS_FILE" \
-	$ADCM_ADDRESS/api/v1/adcm/$ADCM_ID/config/history/\?view\=interface 2>&1 1>/dev/null
+	"$ADCM_ADDRESS/api/v1/adcm/$ADCM_ID/config/history/" 2>&1 1>/dev/null
 echo "Setting updated"
 
 # Bundles upload
@@ -72,7 +75,7 @@ do
     	--header "Authorization: Token $token" \
     	-X POST \
     	--data '{"bundle_file":"'$f'"}' \
-    	$ADCM_ADDRESS/api/v1/stack/load/?view=interface
+    	"$ADCM_ADDRESS/api/v1/stack/load/"
 done
 
 # Bundles license acceptance
@@ -82,7 +85,7 @@ ids=$(curl --silent \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
 	 	-X GET \
-	 	$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0 \
+	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
 	 	| jq -r '.results[] | select(.license=="unaccepted") | .id')
 for id in $ids;
 do
@@ -94,3 +97,54 @@ do
 	-X PUT \
 	$ADCM_ADDRESS/api/v1/stack/bundle/$id/license/accept/?view=interface
 done
+echo "Licenses accepted"
+
+# Getting SSH Common bundle id
+sshBundleId=$(curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+	 	-X GET \
+	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
+	 	| jq --arg name "$BUNDLE_NAME_SSH_COMMON" -r \
+	 		'.results[] | select(.name==$name) | .id')
+
+printf "SSH Common bundle id=%s\n" $sshBundleId
+
+# Getting host provider prototype (bundle version-related) id
+hostProviderPrototypeId=$(curl --silent \
+		--header "Accept: application/json, text/plain, */*" \
+		--header "Authorization: Token $token" \
+	 	-X GET \
+	 	"$ADCM_ADDRESS/api/v1/stack/provider/?page=0&limit=500" \
+	 	| jq -r '.results[] | select(.id=98) | .id')
+printf "Prototype id=%s)\n" $hostProviderPrototypeId
+
+# Creating hostprovider
+echo "Creating host provider"
+hostProviderJson="{ \
+	\"prototype_id\":	\"$hostProviderPrototypeId\", \
+	\"name\": 			\"$HOSTPROVIDER_NAME\", \
+	\"display_name\": 	\"$BUNDLE_NAME_SSH_COMMON\", \
+	\"bundle_id\": 		\"$sshBundleId\" \
+}"
+curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "$hostProviderJson" \
+	"$ADCM_ADDRESS/api/v1/provider/?view=interface" 2>&1 1>/dev/null
+
+# Getting host provider id
+hostProviderId=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+ 	"$ADCM_ADDRESS/api/v1/provider/?limit=10&offset=0" \
+ 	| jq --arg name "$HOSTPROVIDER_NAME" -r \
+ 		'.results[] | select(.name==$name) | .id')
+printf "Host provider ready, id=%s\n" $hostProviderId
+
+# Creating hosts
