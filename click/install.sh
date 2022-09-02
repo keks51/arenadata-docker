@@ -5,22 +5,22 @@ ADCM_ID=1
 ADCM_SETTINGS_FILE=adcmconfig.json
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 HOSTPROVIDER_NAME="HostProvider0"
-HOSTS=["ch1","ch2","ch3"]
+HOSTS=("ch1" "ch2" "ch3") # host name == host id
 
 #####################
 # Prepare containers and get access token
 #####################
 
-echo "stopping ADCM ..."
-docker compose stop
-docker compose rm -f
-echo "ADCM stopped"
+#echo "stopping ADCM ..."
+#docker compose stop
+#docker compose rm -f
+#echo "ADCM stopped"
 
-echo "Building node images..."
-docker build -t keks51-centos7 -f Dockerfile .
-echo "ADCM node images ready"
+#echo "Building node images..."
+#docker build -t keks51-centos7 -f Dockerfile .
+#echo "ADCM node images ready"
 
-docker compose up -d
+#docker compose up -d
 
 echo "Gettting auth. token"
 echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
@@ -148,3 +148,44 @@ hostProviderId=$(curl --silent \
 printf "Host provider ready, id=%s\n" $hostProviderId
 
 # Creating hosts
+echo "make sure you specified env variable 'ANSIBLE_USERNAME' and 'ANSIBLE_PASSWORD' without quotes"
+for host in ${HOSTS[@]};
+do
+	printf "Creating host, name/hostname=%s... " $host
+	hostJson="{\"fqdn\": \"$host\"}"
+	hostId=$(curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+		-X POST \
+		--data "$hostJson" \
+		"$ADCM_ADDRESS/api/v1/provider/5/host/" \
+		| jq -r '.id')
+	if [[ "$hostId" == "null" ]]; then
+		echo "\nWarning: HOST ALREADY DEFINED, SKIPPING FURTHER HOST CONFIGURATION"
+		break
+	fi	
+	printf "DONE, id=%s\nChanging host configuration..." $hostId	
+	hostConfigJson="{ \
+		\"config\":{ \
+			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
+			\"ansible_ssh_pass\"				:\"$ANSIBLE_PASSWORD\", \
+			\"ansible_ssh_private_key_file\"	:null, \
+			\"ansible_host\"					:\"$host\", \
+			\"ansible_ssh_port\"				:\"22\", \
+			\"ansible_ssh_common_args\"			:\"-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\", \
+			\"ansible_become\"					:true, \
+			\"ansible_become_pass\"				:null \
+		}, \
+		\"attr\":{}
+	}"
+	curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+		-X POST \
+		--data "$hostConfigJson" \
+		"$ADCM_ADDRESS/api/v1/host/$hostId/config/history/" 2>&1 1>/dev/null
+	#echo "DONE\nInstalling health checker"
+
+done
