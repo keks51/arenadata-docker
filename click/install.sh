@@ -11,16 +11,16 @@ HOSTS=("ch1" "ch2" "ch3") # host name == host id
 # Prepare containers and get access token
 #####################
 
-#echo "stopping ADCM ..."
-#docker compose stop
-#docker compose rm -f
-#echo "ADCM stopped"
+echo "stopping ADCM ..."
+docker compose stop
+docker compose rm -f
+echo "ADCM stopped"
 
-#echo "Building node images..."
-#docker build -t keks51-centos7 -f Dockerfile .
-#echo "ADCM node images ready"
+echo "Building node images..."
+docker build -t keks51-centos7 -f Dockerfile .
+echo "ADCM node images ready"
 
-#docker compose up -d
+docker compose up -d
 
 echo "Gettting auth. token"
 echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
@@ -162,7 +162,9 @@ do
 		"$ADCM_ADDRESS/api/v1/provider/5/host/" \
 		| jq -r '.id')
 	if [[ "$hostId" == "null" ]]; then
-		echo "\nWarning: HOST ALREADY DEFINED, SKIPPING FURTHER HOST CONFIGURATION"
+		# if hostId is null, other host-related actions are non-functional
+		# possible solution is to get host list and not rely on hostId from method above
+		echo "\nWarning: HOST ALREADY DEFINED, delete host and restart"
 		break
 	fi	
 	printf "DONE, id=%s\nChanging host configuration..." $hostId	
@@ -186,6 +188,40 @@ do
 		-X POST \
 		--data "$hostConfigJson" \
 		"$ADCM_ADDRESS/api/v1/host/$hostId/config/history/" 2>&1 1>/dev/null
-	#echo "DONE\nInstalling health checker"
-
+	echo "DONE\nInstalling health checker"
+	actionId=$(curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+	 	-X GET \
+	 	"$ADCM_ADDRESS/api/v1/host/$hostId/action/" \
+	 	| jq  -r '.[] | select(.name=="statuschecker") | .id')
+	 taskId=$(curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+		-X POST \
+		--data "{\"verbose\":false}" \
+		"$ADCM_ADDRESS/api/v1/host/$hostId/action/$actionId/run/" \
+		| jq -r '.id')
+		echo "Status checker installation started, task id=$taskId"	
+	 	while true
+		do
+			status=$(curl --silent \
+			--header "Content-Type:application/json" \
+			--header "Accept:application/json" \
+			--header "Authorization: Token $token" \
+			-X GET \
+			"$ADCM_ADDRESS/api/v1/task/$taskId/" \
+			| jq -r '.status')
+			if [[ -n "$status" && "$status" == "success" ]]; then
+				break
+			else
+				echo "."
+				sleep 10 
+			fi
+		done
+ printf "Creating host, name/hostname=%s... " $host
 done
+
+
