@@ -1,0 +1,216 @@
+{
+  "config": {
+    "installed_switch": false,
+    "ldap_conf": {
+      "ldap_host": "localhost",
+      "ldap_port": 636,
+      "auth_dn_prefix": "uid=",
+      "auth_dn_suffix": ",ou=users,dc=example,dc=com",
+      "enable_tls": "no",
+      "tls_minimum_protocol_version": "tls1.2",
+      "tls_require_cert": "demand",
+      "tls_cert_file": "/path/to/tls_cert_file",
+      "tls_key_file": "/path/to/tls_key_file",
+      "tls_ca_cert_file": "/path/to/tls_ca_cert_file",
+      "tls_ca_cert_dir": "/path/to/tls_ca_cert_dir",
+      "tls_cipher_suite": null,
+      "rbac_enable": false,
+      "rbac_default_role": "default",
+      "rbac_base_dn": "ou=Groups,dc=ad,dc=ranger-test",
+      "rbac_search_filter": "(&amp;(objectClass=groupOfNames)(member={bind_dn}))",
+      "rbac_attribute": "cn",
+      "rbac_role_prefix": "adqm_"
+    },
+    "kafka_engine": {
+      "kafka_properties": null
+    },
+    "coordination_engines": {
+      "engine": "zookeeper"
+    },
+    "chkeeper": {
+      "nodes_count": 1,
+      "keeper_server_tcp_port": 2129,
+      "keeper_server_log_storage_path": "/var/lib/clickhouse-keeper/coordination/log",
+      "keeper_server_snapshot_storage_path": "/var/lib/clickhouse-keeper/coordination/snapshots",
+      "coordination_settings_operation_timeout_ms": 10000,
+      "coordination_settings_session_timeout_ms": 30000,
+      "coordination_settings_snapshot_distance": 100000,
+      "coordination_settings_raft_logs_level": "error",
+      "coordination_settings_rotate_log_storage_interval": 10000,
+      "raft_configuration_port": 9444,
+      "root_path": "/clickhouse",
+      "distributed_ddl_path": "/clickhouse/task_queue/ddl"
+    },
+    "Zookeeper": {
+      "root_path": "/clickhouse",
+      "distributed_ddl_path": "/clickhouse/task_queue/ddl"
+    },
+    "adqmdb_zk": {
+      "zk_hosts": null
+    },
+    "Limits": {
+      "max_connections": 4096,
+      "max_concurrent_queries": 100
+    },
+    "Network": {
+      "http_port": 8123,
+      "listen_host": "0.0.0.0"
+    },
+    "Directories": {
+      "data_path": "/var/lib/clickhouse/",
+      "tmp_path": "/var/lib/clickhouse/tmp/",
+      "user_files_path": "/var/lib/clickhouse/user_files/",
+      "access_control_path": "/var/lib/clickhouse/access/"
+    },
+    "Cluster_configuration": {
+      "replication_factor": 2,
+      "cluster_topology": "{}",
+      "cluster_config": {
+        "cluster": []
+      }
+    },
+    "log_settings": {
+      "database": "system",
+      "partition_by": "(event_date)",
+      "flush_interval": 7500,
+      "ttl": 30,
+      "query_log": false,
+      "trace_log": false,
+      "query_views_log": false,
+      "query_thread_log": false,
+      "part_log": false,
+      "crash_log": false,
+      "session_log": false
+    },
+    "Other": {
+      "default_database": "default",
+      "default_profile": "default",
+      "external_dictionaries_path": "/etc/clickhouse-server/ad_dicts/",
+      "external_dictionaries": {}
+    },
+    "default_configs": {
+      "default_profile_settings": {
+        "max_memory_usage": "10000000000",
+        "use_uncompressed_cache": "0"
+      },
+      "access_management": true,
+      "ip": [],
+      "host": [],
+      "host_regexp": []
+    },
+    "advanced_configs": {
+      "variables": {}
+    },
+    "storage_config": null,
+    "jdbc_bridge_conf": {
+      "datasource_json": [
+        {
+          "$schema": "./datasource.jschema",
+          "postgres13": {
+            "converter": {
+              "mappings": [
+                {
+                  "nativeType": "bool",
+                  "toType": "String"
+                }
+              ]
+            },
+            "driverUrls": [
+              "drivers/postgresql/postgresql-jdbc.jar"
+            ],
+            "driverClassName": "org.postgresql.Driver",
+            "jdbcUrl": "jdbc:postgresql://localhost/test",
+            "username": "",
+            "password": "",
+            "initializationFailTimeout": 0,
+            "minimumIdle": 0,
+            "maximumPoolSize": 10
+          }
+        },
+        {
+          "$schema": "./datasource.jschema",
+          "ch-server": {
+            "driverUrls": [
+              "drivers/clickhouse/clickhouse-jdbc.jar"
+            ],
+            "driverClassName": "ru.yandex.clickhouse.ClickHouseDriver",
+            "jdbcUrl": "jdbc:clickhouse://ch-server:8123/system",
+            "username": "default",
+            "password": "",
+            "initializationFailTimeout": 0,
+            "minimumIdle": 0,
+            "maximumPoolSize": 10
+          }
+        }
+      ],
+      "server_json": "{\n  \"requestTimeout\": 5000,\n  \"queryTimeout\": 60000,\n  \"configScanPeriod\": 5000,\n  \"repositories\": [\n    {\n      \"entity\": \"ru.yandex.clickhouse.jdbcbridge.core.NamedDataSource\",\n      \"repository\": \"ru.yandex.clickhouse.jdbcbridge.impl.JsonFileRepository\"\n    },\n    {\n      \"entity\": \"ru.yandex.clickhouse.jdbcbridge.core.NamedSchema\",\n      \"repository\": \"ru.yandex.clickhouse.jdbcbridge.impl.JsonFileRepository\"\n    },\n    {\n      \"entity\": \"ru.yandex.clickhouse.jdbcbridge.core.NamedQuery\",\n      \"repository\": \"ru.yandex.clickhouse.jdbcbridge.impl.JsonFileRepository\"\n    }\n  ],\n  \"extensions\": [\n    {\n      \"class\": \"ru.yandex.clickhouse.jdbcbridge.impl.JdbcDataSource\"\n    },\n    {\n      \"class\": \"ru.yandex.clickhouse.jdbcbridge.impl.ConfigDataSource\"\n    },\n    {\n      \"class\": \"ru.yandex.clickhouse.jdbcbridge.impl.ScriptDataSource\"\n    }\n  ]\n}\n"
+    },
+    "components": {
+      "chserver": {
+        "systemd": {
+          "service_name": "clickhouse-server"
+        }
+      },
+      "jdbc_bridge": {
+        "systemd": {
+          "service_name": "clickhouse-jdbc-bridge"
+        }
+      }
+    },
+    "actions": {
+      "default": {
+        "order": [
+          "main",
+          "chserver",
+          "jdbc_bridge"
+        ]
+      },
+      "start": {
+        "order": [
+          "chserver",
+          "jdbc_bridge"
+        ]
+      },
+      "stop": {
+        "order": [
+          "chserver",
+          "jdbc_bridge"
+        ]
+      },
+      "restart": {
+        "order": [
+          "chserver",
+          "jdbc_bridge"
+        ]
+      },
+      "statuschecker": {
+        "order": [
+          "chserver",
+          "jdbc_bridge"
+        ]
+      },
+      "check": {
+        "order": [
+          "chserver",
+          "jdbc_bridge",
+          "main"
+        ]
+      }
+    },
+    "__main_info": "<p>ClickHouse is a column-oriented database management system (DBMS) for online analytical processing of queries (OLAP).</p>\n"
+  },
+  "attr": {
+    "ldap_conf": {
+      "active": false
+    },
+    "kafka_engine": {
+      "active": false
+    },
+    "chkeeper": {
+      "active": false
+    },
+    "adqmdb_zk": {
+      "active": false
+    }
+  }
+}

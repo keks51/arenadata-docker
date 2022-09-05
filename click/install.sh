@@ -8,6 +8,8 @@ BUNDLE_NAME_ADQM="ADQM"
 HOSTPROVIDER_NAME="HostProvider0"
 CLUSTER_NAME="Cluster0"
 HOSTS=("ch1" "ch2" "ch3") # host name == host id
+SERVICE_NAMES=("adqmdb" "zookeeper")
+ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
 # #####################
 # # Prepare containers and get access token
@@ -44,7 +46,7 @@ done
 printf "ADCM ( %s ) is UP and token received\n" $ADCM_ADDRESS
 
 #######################
-# Configuration part
+# ADCM Configuration part
 ######################
 echo "ADCM configuration..."
 printf "Applying configuration file %s\n" $ADCM_SETTINGS_FILE
@@ -224,6 +226,11 @@ do
 		done
 done
 
+
+############
+#  Cluster configuration
+############
+
 # Creating cluster
 echo "DONE\nInstalling health checker"
 adqmJson=$(curl --silent \
@@ -250,4 +257,48 @@ clusterId=$(curl --silent \
 	--data "$hostProviderJson" \
 	"$ADCM_ADDRESS/api/v1/cluster/" \
 	| jq -r '.id')
-printf "Cluster created id=%s)\n" $clusterId	
+if [[ "$clusterId" == "null" ]]; then
+	# if clusterId is null, other host-related actions are non-functional
+	# possible solution is to get host list and not rely on clusterId from method above
+	echo "\nWarning: Cluster ALREADY DEFINED, please delete cluster and restart"
+ 		break
+else
+	printf "Cluster created id=%s)\n" $clusterId		
+fi		
+
+# Assign Services to Cluster
+echo "Assigning services to the cluster..."
+servicesJson=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/serviceprototype/")
+for serviceName in ${SERVICE_NAMES[@]};
+do  
+	servicePrototypeId=$(echo $servicesJson | jq --arg name "$serviceName" -r '.[] | select(.name==$name) | .id')
+	curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "{\"prototype_id\":$servicePrototypeId}" \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/" 2>&1 1>/dev/null
+done
+echo "DONE\nConfiguring ADQMDB cluster service"
+adqmdbClusterServiceId=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+ 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/?limit=10&offset=0" \
+ 	| jq  -r '.results[] | select(.name=="adqmdb") | .id')
+printf "Applying configuration file %s to cluster service id=%s\n" $ADQMDB_SETTINGS_FILE $adqmdbClusterServiceId
+curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "@$ADQMDB_SETTINGS_FILE" \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/$adqmdbClusterServiceId/config/history/" 2>&1 1>/dev/null
+echo "Setting updated"
