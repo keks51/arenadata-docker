@@ -4,12 +4,14 @@ ADCM_ADDRESS="http://localhost:8000"
 ADCM_ID=1
 ADCM_SETTINGS_FILE=adcmconfig.json
 BUNDLE_NAME_SSH_COMMON="SSH Common"
+BUNDLE_NAME_ADQM="ADQM"
 HOSTPROVIDER_NAME="HostProvider0"
+CLUSTER_NAME="Cluster0"
 HOSTS=("ch1" "ch2" "ch3") # host name == host id
 
-#####################
-# Prepare containers and get access token
-#####################
+# #####################
+# # Prepare containers and get access token
+# #####################
 
 echo "stopping ADCM ..."
 docker compose stop
@@ -40,7 +42,6 @@ do
 	fi
 done
 printf "ADCM ( %s ) is UP and token received\n" $ADCM_ADDRESS
-
 
 #######################
 # Configuration part
@@ -221,7 +222,32 @@ do
 				sleep 10 
 			fi
 		done
- printf "Creating host, name/hostname=%s... " $host
 done
 
-
+# Creating cluster
+echo "DONE\nInstalling health checker"
+adqmJson=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+ 	"$ADCM_ADDRESS/api/v1/stack/cluster/?page=0&limit=500&ordering=-version&display_name=$BUNDLE_NAME_ADQM")
+adqmBundleId=$(echo $adqmJson | jq -r '.results[0] | .bundle_id')
+adqmPrototypeId=$(echo $adqmJson | jq -r '.results[0] | .id')
+# Creating hostprovider
+echo "Creating cluster"
+hostProviderJson="{ \
+	\"prototype_id\":	\"$adqmPrototypeId\", \
+	\"name\": 			\"$CLUSTER_NAME\", \
+	\"display_name\": 	\"$BUNDLE_NAME_ADQM\", \
+	\"bundle_id\": 		\"$adqmBundleId\" \
+}"
+clusterId=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "$hostProviderJson" \
+	"$ADCM_ADDRESS/api/v1/cluster/" \
+	| jq -r '.id')
+printf "Cluster created id=%s)\n" $clusterId	
