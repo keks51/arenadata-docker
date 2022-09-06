@@ -11,21 +11,21 @@ HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
-# # #####################
-# # # 1. Prepare containers and get access token
-# echo "[phase 1] System restart, waiting for token"
-# # #####################
+# #####################
+# 1. Prepare containers and get access token
+echo "[phase 1] System restart, waiting for token"
+# #####################
 
-# echo "stopping ADCM ..."
-# docker compose stop
-# docker compose rm -f
-# echo "ADCM stopped"
+echo "stopping ADCM ..."
+docker compose stop
+docker compose rm -f
+echo "ADCM stopped"
 
-# echo "Building node images..."
-# docker build -t keks51-centos7 -f Dockerfile .
-# echo "ADCM node images ready"
+echo "Building node images..."
+docker build -t keks51-centos7 -f Dockerfile .
+echo "ADCM node images ready"
 
-# docker compose up -d
+docker compose up -d
 
 echo "Gettting auth. token"
 echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
@@ -36,7 +36,7 @@ do
 	 	-X POST \
 	 	--data '{"username":"'$ADCM_USERNAME'","password":"'$ADCM_PASSWORD'"}' \
 	 	"$ADCM_ADDRESS/api/v1/rbac/token/" \
-	 	| jq -r ".token")
+	 	| jq -r '.token')
 	if [[ -n "$token" && "$token" != "null" ]]; then
 		break
 	else
@@ -229,8 +229,8 @@ do
 done
 
 ############
-#  4 . Cluster configuration
-echo "[phase 4] Cluster setup"
+#  4 . Cluster Configuration
+echo "[phase 4] Cluster Configuration"
 ############
 
 # Creating cluster
@@ -322,4 +322,41 @@ do
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/host/" 2>&1 1>/dev/null
 done
 echo "Mapping components to cluster hosts"
+sleep 1
+hostComponentJson=$(curl --silent \
+	--header "Accept:application/json, text/plain, */*" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/?view=interface")
+componentIds=($(echo $hostComponentJson | jq -r '.component | .[].id'))
+serviceIds=($(echo $hostComponentJson | jq -r '.component | .[].service_id'))
+hostIds=($(echo $hostComponentJson | jq -r '.host | .[].id'))
+hcJsonObjectsArray=()
+for i in 0 1 2
+do
+	componentId=${componentIds[i]}
+	serviceId=${serviceIds[i]}
+	for hostId in ${hostIds[@]};
+	do
+		hcJsonObjectsArray+=("{\"host_id\":$hostId, \"service_id\":$serviceId, \"component_id\":$componentId}")
+	done
+done
+hcJsonObjectsString=$(IFS=,\n;printf  "%s" "${hcJsonObjectsArray[*]}")
+mappingJson="{
+  \"cluster_id\": ${clusterId},
+  \"hc\": [
+   	${hcJsonObjectsString}
+  ]
+}"
+curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "$mappingJson" \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/" 2>&1 1>/dev/null
 
+############
+#  5 . Cluster Installation
+echo "[phase 5] Cluster Installation"
+############
