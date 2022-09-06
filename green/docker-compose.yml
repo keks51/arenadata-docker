@@ -1,3 +1,14 @@
+# 1) Master node and segments
+# - SEGMENT_HOSTNAMES=sdw1,sdw2,sdw3
+# - CONF__MASTER_HOSTNAME=mdw
+# - CONF__MASTER_HOSTNAME=mdw
+# - CONF__MASTER_PORT=5432
+# - CONF__MASTER_DATA_DIRECTORY=/data/master
+# 2) With Standby Node
+# - STANDBY_HOSTNAME=mdw-standby
+# - STANDBY_PORT=5432
+# - STANDBY_DIRECTORY=/data/standby_master    dir name should not equal master node dir name
+# 3) With Mirror segments
 version: '2'
 services:
   mdw:
@@ -6,11 +17,24 @@ services:
     hostname: mdw
     privileged: true
     environment:
-      - CONF__SEGMENTS=sdw1,sdw2,sdw3
+      - SEGMENT_HOSTNAMES=sdw1,sdw2,sdw3
       - CONF__MASTER_HOSTNAME=mdw
       - CONF__MASTER_PORT=5432
+      - CONF__MASTER_DATA_DIRECTORY=/data/master
+      - CONF__MIRROR_PORT_BASE=7000
+      - CONF__MIRROR_DATA_DIRECTORY=/data/mirror
+      - STANDBY_HOSTNAME=mdw-standby
+      - STANDBY_PORT=5432
+      - STANDBY_DIRECTORY=/data/standby_master
     volumes:
       - ./volume/mdw/:/data/
+  mdw-standby:
+    image: keks51-green
+    container_name: mdw-standby
+    hostname: mdw-standby
+    privileged: true
+    volumes:
+      - ./volume/mdw_standby/:/data/
   sdw1:
     image: keks51-green
     container_name: sdw1

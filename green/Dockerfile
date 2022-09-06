@@ -55,6 +55,10 @@ COPY ./open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm /home/gpadmin/
 RUN cd /home/gpadmin/ && \
     yum install -y open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm
 
+# for pxf
+RUN yum install java-11-openjdk unzip maven
+
+
 RUN chown -R gpadmin:gpadmin /usr/local/greenplum* && \
     chgrp -R gpadmin /usr/local/greenplum*
 

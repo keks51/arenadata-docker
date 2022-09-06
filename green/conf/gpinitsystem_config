@@ -55,7 +55,7 @@ ENCODING=UNICODE
 #### will be created. The number of mirror locations must equal the
 #### number of primary locations as specified in the
 #### DATA_DIRECTORY parameter.
-#declare -a MIRROR_DATA_DIRECTORY=(/data1/mirror /data1/mirror /data1/mirror /data2/mirror /data2/mirror /data2/mirror)
+#declare -a MIRROR_DATA_DIRECTORY=(/data/mirror)
 
 
 ################################################
@@ -63,7 +63,7 @@ ENCODING=UNICODE
 ################################################
 
 #### Create a database of this name after initialization.
-#DATABASE_NAME=name_of_database
+DATABASE_NAME=default
 
 #### Specify the location of the host address file here instead of
 #### with the -h option of gpinitsystem.

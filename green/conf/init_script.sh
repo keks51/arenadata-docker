@@ -10,8 +10,8 @@ mkdir -p /data/mirror
 mkdir -p /data/master
 chown -R gpadmin:gpadmin /data/*
 
-echo "\nSegments are ${CONF__SEGMENTS}" | sudo tee -a /proc/1/fd/1
-echo ${CONF__SEGMENTS} | sed "s/,/\n/g" > /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+echo "\nSegments are ${SEGMENT_HOSTNAMES}" | sudo tee -a /proc/1/fd/1
+echo ${SEGMENT_HOSTNAMES} | sed "s/,/\n/g" > /home/gpadmin/gpconfigs/hostfile_gpinitsystem
 
 echo "\nOverriding conf with env variables" | sudo tee -a /proc/1/fd/1
 su gpadmin -s /home/gpadmin/override_conf.sh
