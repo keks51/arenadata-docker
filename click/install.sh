@@ -16,10 +16,10 @@ ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 echo "[phase 1] System restart, waiting for token"
 # #####################
 
-echo "stopping ADCM ..."
+echo "stopping ADCM and nodes ..."
 docker compose stop
 docker compose rm -f
-echo "ADCM stopped"
+echo "ADCM and nodes stopped"
 
 echo "Building node images..."
 docker build -t keks51-centos7 -f Dockerfile .
@@ -61,7 +61,9 @@ curl --silent \
 echo "Setting updated"
 
 # Bundles upload
+
 cd bundles
+
 for f in *;
 do
     printf "uploading bundle ( %s )\n" $f
@@ -92,7 +94,6 @@ ids=$(curl --silent \
 	 	| jq -r '.results[] | select(.license=="unaccepted") | .id')
 for id in $ids;
 do
-	#http://localhost:8000/api/v1/stack/bundle/20/license/accept/?view=interface
 	curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -360,3 +361,38 @@ curl --silent \
 #  5 . Cluster Installation
 echo "[phase 5] Cluster Installation"
 ############
+actionId=$(curl --silent \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+ 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/action/" \
+ 	| jq  -r '.[] | select(.name=="install") | .id')
+taskId=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "{\"verbose\":false}" \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/action/$actionId/run/" \
+	| jq -r '.id')
+	echo "Cluster installation started, task id=$taskId"	
+ 	while true
+	do
+		status=$(curl --silent \
+		--header "Content-Type:application/json" \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+		-X GET \
+		"$ADCM_ADDRESS/api/v1/task/$taskId/" \
+		| jq -r '.status')
+		if [[ -n "$status" && "$status" == "success" ]]; then
+			echo "Installation Completed"
+			break
+		elif [[ -n "$status" && "$status" == "failed" ]]; then
+			echo "Installation Failed"
+			break
+		else
+			echo "."
+			sleep 10 
+		fi
+	done
