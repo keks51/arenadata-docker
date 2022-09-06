@@ -11,21 +11,21 @@ HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
-# #####################
-# # 1. Prepare containers and get access token
-echo "[phase 1] System restart, waiting for token"
-# #####################
+# # #####################
+# # # 1. Prepare containers and get access token
+# echo "[phase 1] System restart, waiting for token"
+# # #####################
 
-echo "stopping ADCM ..."
-docker compose stop
-docker compose rm -f
-echo "ADCM stopped"
+# echo "stopping ADCM ..."
+# docker compose stop
+# docker compose rm -f
+# echo "ADCM stopped"
 
-echo "Building node images..."
-docker build -t keks51-centos7 -f Dockerfile .
-echo "ADCM node images ready"
+# echo "Building node images..."
+# docker build -t keks51-centos7 -f Dockerfile .
+# echo "ADCM node images ready"
 
-docker compose up -d
+# docker compose up -d
 
 echo "Gettting auth. token"
 echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
@@ -85,7 +85,6 @@ done
 # Bundles license acceptance
 echo "\nAccepting bundle license"
 ids=$(curl --silent \
-		--header "Content-Type:application/json" \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
 	 	-X GET \
@@ -104,7 +103,6 @@ done
 
 # Getting SSH Common bundle id
 sshBundleId=$(curl --silent \
-		--header "Content-Type:application/json" \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
 	 	-X GET \
@@ -147,7 +145,6 @@ curl --silent \
 
 # Getting host provider id
 hostProviderId=$(curl --silent \
-	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
  	-X GET \
@@ -199,7 +196,6 @@ do
 		"$ADCM_ADDRESS/api/v1/host/$hostId/config/history/" 2>&1 1>/dev/null
 	echo "Installing health checker"
 	actionId=$(curl --silent \
-		--header "Content-Type:application/json" \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
 	 	-X GET \
@@ -240,7 +236,6 @@ echo "[phase 4] Cluster setup"
 # Creating cluster
 echo "Installing health checker"
 adqmJson=$(curl --silent \
-	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
  	-X GET \
@@ -275,7 +270,6 @@ fi
 # Assign Services to Cluster
 echo "Assigning services to the cluster..."
 servicesJson=$(curl --silent \
-	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
  	-X GET \
@@ -292,8 +286,10 @@ do
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/" 2>&1 1>/dev/null
 done
 echo "Configuring ADQMDB cluster service"
+
+cd ..
+
 adqmdbClusterServiceId=$(curl --silent \
-	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
  	-X GET \
@@ -309,7 +305,6 @@ curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/$adqmdbClusterServiceId/config/history/" 2>&1 1>/dev/null
 echo "Adding hosts to the cluster"
 hostIds=$(curl --silent \
-	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
  	-X GET \
@@ -327,3 +322,4 @@ do
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/host/" 2>&1 1>/dev/null
 done
 echo "Mapping components to cluster hosts"
+
