@@ -12,7 +12,8 @@ SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
 # #####################
-# # Prepare containers and get access token
+# # 1. Prepare containers and get access token
+echo "[phase 1] System restart, waiting for token"
 # #####################
 
 echo "stopping ADCM ..."
@@ -46,9 +47,9 @@ done
 printf "ADCM ( %s ) is UP and token received\n" $ADCM_ADDRESS
 
 #######################
-# ADCM Configuration part
+# 2. ADCM Configuration part
+echo "[phase 2] ADCM configuration"
 ######################
-echo "ADCM configuration..."
 printf "Applying configuration file %s\n" $ADCM_SETTINGS_FILE
 curl --silent \
 	--header "Content-Type:application/json" \
@@ -71,14 +72,14 @@ do
     	--header "Connection: keep-alive" \
     	-F file=@$f \
     	-X POST \
-    	$ADCM_ADDRESS/api/v1/stack/upload/?view=interface 
+    	"$ADCM_ADDRESS/api/v1/stack/upload/" 2>&1 1>/dev/null
     curl  --silent \
     	--header "Content-Type:application/json" \
     	--header "application/json, text/plain, */*" \
     	--header "Authorization: Token $token" \
     	-X POST \
     	--data '{"bundle_file":"'$f'"}' \
-    	"$ADCM_ADDRESS/api/v1/stack/load/"
+    	"$ADCM_ADDRESS/api/v1/stack/load/" 2>&1 1>/dev/null
 done
 
 # Bundles license acceptance
@@ -98,9 +99,8 @@ do
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
 	-X PUT \
-	$ADCM_ADDRESS/api/v1/stack/bundle/$id/license/accept/?view=interface
+	"$ADCM_ADDRESS/api/v1/stack/bundle/$id/license/accept/"
 done
-echo "Licenses accepted"
 
 # Getting SSH Common bundle id
 sshBundleId=$(curl --silent \
@@ -113,6 +113,12 @@ sshBundleId=$(curl --silent \
 	 		'.results[] | select(.name==$name) | .id')
 
 printf "SSH Common bundle id=%s\n" $sshBundleId
+
+
+#######################
+# 2. Host/Hostprovider Configuration part
+echo "[phase 3] Hostprovider and hosts configuration"
+######################
 
 # Getting host provider prototype (bundle version-related) id
 hostProviderPrototypeId=$(curl --silent \
@@ -162,7 +168,7 @@ do
 		--header "Authorization: Token $token" \
 		-X POST \
 		--data "$hostJson" \
-		"$ADCM_ADDRESS/api/v1/provider/5/host/" \
+		"$ADCM_ADDRESS/api/v1/provider/$hostProviderId/host/" \
 		| jq -r '.id')
 	if [[ "$hostId" == "null" ]]; then
 		# if hostId is null, other host-related actions are non-functional
@@ -170,7 +176,7 @@ do
 		echo "\nWarning: HOST ALREADY DEFINED, delete host and restart"
 		break
 	fi	
-	printf "DONE, id=%s\nChanging host configuration..." $hostId	
+	printf "Host created with id=%s\nChanging host configuration..." $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -191,7 +197,7 @@ do
 		-X POST \
 		--data "$hostConfigJson" \
 		"$ADCM_ADDRESS/api/v1/host/$hostId/config/history/" 2>&1 1>/dev/null
-	echo "DONE\nInstalling health checker"
+	echo "Installing health checker"
 	actionId=$(curl --silent \
 		--header "Content-Type:application/json" \
 		--header "Accept:application/json" \
@@ -226,13 +232,13 @@ do
 		done
 done
 
-
 ############
-#  Cluster configuration
+#  4 . Cluster configuration
+echo "[phase 4] Cluster setup"
 ############
 
 # Creating cluster
-echo "DONE\nInstalling health checker"
+echo "Installing health checker"
 adqmJson=$(curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -285,7 +291,7 @@ do
 	--data "{\"prototype_id\":$servicePrototypeId}" \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/" 2>&1 1>/dev/null
 done
-echo "DONE\nConfiguring ADQMDB cluster service"
+echo "Configuring ADQMDB cluster service"
 adqmdbClusterServiceId=$(curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -301,4 +307,23 @@ curl --silent \
 	-X POST \
 	--data "@$ADQMDB_SETTINGS_FILE" \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/$adqmdbClusterServiceId/config/history/" 2>&1 1>/dev/null
-echo "Setting updated"
+echo "Adding hosts to the cluster"
+hostIds=$(curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+ 	-X GET \
+	"$ADCM_ADDRESS/api/v1/host/?limit=10&page=0&cluster_is_null=true&offset=0&status=" \
+ 	| jq -r '.results[] | .id')
+for hostId in ${hostIds[@]};
+do
+	printf "Adding host with id=%s to cluster $clusterId\n" $hostId
+	curl --silent \
+	--header "Content-Type:application/json" \
+	--header "Accept:application/json" \
+	--header "Authorization: Token $token" \
+	-X POST \
+	--data "{\"host_id\":$hostId}" \
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/host/" 2>&1 1>/dev/null
+done
+echo "Mapping components to cluster hosts"
