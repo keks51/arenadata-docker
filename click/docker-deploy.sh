@@ -1,10 +1,14 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 echo "Stopping ADCM and node containers ..."
 docker compose stop
 docker compose rm -f
 
+echo "Removing arenadata/adcm image"
+docker image rm arenadata/adcm
+
 echo "Cleaning ADCM volume directory"
+# volume directory name specified in docker-compose.yml
 rm -rf volume
 
 echo "Building node images..."

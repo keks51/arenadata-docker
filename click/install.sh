@@ -9,6 +9,7 @@ CLUSTER_NAME="Cluster0"
 HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
+# Files inside this names will be automatically renamed to avodi special characters
 BUNDLES_LOCATION="$(pwd)/bundles"
 
 set -e
@@ -44,8 +45,9 @@ curl --silent \
 	--data "@$ADCM_SETTINGS_FILE" \
 	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/" 2>&1 1>/dev/null
 
-printf "Uploading bundles from %s \n" $BUNDLES_LOCATION
-find $BUNDLES_LOCATION -iname "*.tgz" | while read fullFileName
+printf "Preparing bundles from %s \n" $BUNDLES_LOCATION
+rename 's/[ @\$]/_/g' $BUNDLES_LOCATION/*
+find $BUNDLES_LOCATION -type f -print0 | while IFS="" read -r -d "" fullFileName
 do
 	printf "uploading bundle \"%s\"\n" $fullFileName
 	curl \
@@ -137,7 +139,7 @@ printf "Host provider ready, id=%s\n" $hostProviderId
 # Creating hosts
 for host in ${HOSTS[@]};
 do
-	printf "Creating host \"%s\"...\n" $host
+	printf "Creating host \"%s\"\n" $host
 	hostJson="{\"fqdn\": \"$host\"}"
 	hostId=$(curl --silent \
 		--header "Content-Type:application/json" \
@@ -151,7 +153,7 @@ do
 		printf "\nError: host %s already defined, please delete host and restart installation" $hostId
 		exit 1
 	fi	
-	printf "Changing host \"%s\" id=%s configuration..." $host $hostId	
+	printf "Changing host \"%s\" id=%s configuration\n" $host $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -187,7 +189,7 @@ do
 		--data "{\"verbose\":false}" \
 		"$ADCM_ADDRESS/api/v1/host/$hostId/action/$actionId/run/" \
 		| jq -r '.id')
-		echo "Status checker installation started, task id=$taskId"	
+		printf "Status checker installation started, task id=%s...\n" $taskId
 	 	while true
 		do
 			status=$(curl --silent \

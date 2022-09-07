@@ -3,3 +3,4 @@
 1. save ADQM and SSH bundles to 'bundles' directory
 1. run install.sh
 
+dependencies: rename, curl, jq
