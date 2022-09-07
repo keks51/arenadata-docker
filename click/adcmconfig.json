@@ -1,0 +1,52 @@
+{
+    "config": {
+        "global": {
+            "adcm_url": "http://adcm:8000"
+        },
+        "google_oauth": {
+            "client_id": null,
+            "secret": null,
+            "whitelisted_domains": []
+        },
+        "job_log": {
+            "log_rotation_on_fs": 365,
+            "log_rotation_in_db": 365
+        },
+        "ansible_settings": {
+            "mitogen": false,
+            "forks": 5
+        },
+        "logrotate": {
+            "size": "10M",
+            "max_history": 10,
+            "compress": false
+        },
+        "config_rotation": {
+            "config_rotation_in_db": 0
+        },
+        "ldap_integration": {
+            "ldap_uri": null,
+            "ldap_user": null,
+            "ldap_password": null,
+            "user_search_base": null,
+            "user_search_filter": null,
+            "user_object_class": "user",
+            "user_name_attribute": "sAMAccountName",
+            "group_search_base": null,
+            "group_search_filter": null,
+            "group_object_class": "group",
+            "group_name_attribute": "cn",
+            "group_member_attribute_name": "member",
+            "sync_interval": 60,
+            "tls_ca_cert_file": null
+        }
+    },
+    "attr": {
+        "logrotate": {
+            "active": false
+        },
+        "ldap_integration": {
+            "active": false
+        }
+    }
+}
