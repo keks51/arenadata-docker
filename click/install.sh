@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 ADCM_ADDRESS="http://localhost:8000"
 ADCM_SETTINGS_FILE=adcmconfig.json
@@ -9,6 +9,7 @@ CLUSTER_NAME="Cluster0"
 HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
+BUNDLES_LOCATION="$(pwd)/bundles"
 
 set -e
 
@@ -33,6 +34,7 @@ done
 # 1. ADCM Configuration part
 echo "[phase 1] ADCM configuration"
 ######################
+
 printf "Applying configuration file %s...\n" $ADCM_SETTINGS_FILE
 curl --silent \
 	--header "Content-Type:application/json" \
@@ -42,31 +44,30 @@ curl --silent \
 	--data "@$ADCM_SETTINGS_FILE" \
 	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/" 2>&1 1>/dev/null
 
-# Bundles upload
-
-cd bundles
-
-for f in *;
+printf "Uploading bundles from %s \n" $BUNDLES_LOCATION
+find $BUNDLES_LOCATION -iname "*.tgz" | while read fullFileName
 do
-    printf "uploading bundle ( %s )\n" $f
-    curl  --silent \
-    	--header "Authorization: Token $token" \
-    	--header "Accept-Encoding: gzip,deflate" \
-    	--header "Accept: application/json, text/plain, */*" \
-    	--header "Connection: keep-alive" \
-    	-F file=@$f \
-    	-X POST \
-    	"$ADCM_ADDRESS/api/v1/stack/upload/" 2>&1 1>/dev/null
-    curl  --silent \
-    	--header "Content-Type:application/json" \
-    	--header "application/json, text/plain, */*" \
-    	--header "Authorization: Token $token" \
-    	-X POST \
-    	--data '{"bundle_file":"'$f'"}' \
-    	"$ADCM_ADDRESS/api/v1/stack/load/" 2>&1 1>/dev/null
+	printf "uploading bundle \"%s\"\n" $fullFileName
+	curl \
+		--header "Authorization: Token $token" \
+		--header "Accept: application/json, text/plain, */*" \
+		--header "Connection: keep-alive" \
+		--header "Content-Type: multipart/form-data" \
+		-F file=@"$fullFileName" \
+		-X POST \
+		"$ADCM_ADDRESS/api/v1/stack/upload/" 
+	baseFileName="$(basename -- $fullFileName)"
+	printf "\nloading bundle \"%s\"\n" $baseFileName
+	curl \
+		--header "Content-Type:application/json" \
+		--header "application/json, text/plain, */*" \
+		--header "Authorization: Token $token" \
+		-X POST \
+		--data "{\"bundle_file\" : \"$baseFileName\" }" \
+		"$ADCM_ADDRESS/api/v1/stack/load/"
 done
 
-echo "Accepting bundle license"
+echo "\nAccepting bundle license"
 ids=$(curl --silent \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
@@ -83,17 +84,6 @@ do
 	"$ADCM_ADDRESS/api/v1/stack/bundle/$id/license/accept/"
 done
 
-# Getting SSH Common bundle id
-sshBundleId=$(curl --silent \
-		--header "Accept:application/json" \
-		--header "Authorization: Token $token" \
-	 	-X GET \
-	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
-	 	| jq --arg name "$BUNDLE_NAME_SSH_COMMON" -r \
-	 		'.results[] | select(.name==$name) | .id')
-
-printf "SSH Common bundle id=%s\n" $sshBundleId
-
 
 #######################
 # 2. Host/Hostprovider Configuration part
@@ -107,7 +97,14 @@ hostProviderPrototypeId=$(curl --silent \
 	 	-X GET \
 	 	"$ADCM_ADDRESS/api/v1/stack/provider/?page=0&limit=500" \
 	 	| jq -r '.results[] | select(.id=98) | .id')
-printf "Prototype id=%s)\n" $hostProviderPrototypeId
+
+sshBundleId=$(curl --silent \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+	 	-X GET \
+	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
+	 	| jq --arg name "$BUNDLE_NAME_SSH_COMMON" -r \
+	 		'.results[] | select(.name==$name) | .id')
 
 # Creating hostprovider
 echo "Creating host provider"
@@ -117,6 +114,8 @@ hostProviderJson="{ \
 	\"display_name\": 	\"$BUNDLE_NAME_SSH_COMMON\", \
 	\"bundle_id\": 		\"$sshBundleId\" \
 }"
+echo "Json:"
+echo $hostProviderJson
 curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -138,7 +137,7 @@ printf "Host provider ready, id=%s\n" $hostProviderId
 # Creating hosts
 for host in ${HOSTS[@]};
 do
-	printf "Creating host, (host)name=%s...\n" $host
+	printf "Creating host \"%s\"...\n" $host
 	hostJson="{\"fqdn\": \"$host\"}"
 	hostId=$(curl --silent \
 		--header "Content-Type:application/json" \
@@ -152,7 +151,7 @@ do
 		printf "\nError: host %s already defined, please delete host and restart installation" $hostId
 		exit 1
 	fi	
-	printf "Changing host (host)name=%s id=$s configuration..." $host $hostId	
+	printf "Changing host \"%s\" id=%s configuration..." $host $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -266,8 +265,6 @@ do
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/" 2>&1 1>/dev/null
 done
 echo "Configuring ADQMDB cluster service"
-
-cd ..
 
 adqmdbClusterServiceId=$(curl --silent \
 	--header "Accept:application/json" \
