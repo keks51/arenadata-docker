@@ -1,7 +1,6 @@
 #!/bin/sh
 
 ADCM_ADDRESS="http://localhost:8000"
-ADCM_ID=1
 ADCM_SETTINGS_FILE=adcmconfig.json
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
@@ -11,24 +10,9 @@ HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
-# #####################
-# 1. Prepare containers and get access token
-echo "[phase 1] System restart, waiting for token"
-# #####################
+set -e
 
-echo "stopping ADCM and nodes ..."
-docker compose stop
-docker compose rm -f
-echo "ADCM and nodes stopped"
-
-echo "Building node images..."
-docker build -t keks51-centos7 -f Dockerfile .
-echo "ADCM node images ready"
-
-docker compose up -d
-
-echo "Gettting auth. token"
-echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
+printf "Waiting for ADCM / Gettting auth. token (%s)...\n" $ADCM_ADDRESS
 while true
 do
 	token=$(curl --silent --header "Content-Type:application/json" \
@@ -41,24 +25,22 @@ do
 		break
 	else
 		echo "."
-		sleep 1 
+		sleep 5 
 	fi
 done
-printf "ADCM ( %s ) is UP and token received\n" $ADCM_ADDRESS
 
 #######################
-# 2. ADCM Configuration part
-echo "[phase 2] ADCM configuration"
+# 1. ADCM Configuration part
+echo "[phase 1] ADCM configuration"
 ######################
-printf "Applying configuration file %s\n" $ADCM_SETTINGS_FILE
+printf "Applying configuration file %s...\n" $ADCM_SETTINGS_FILE
 curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
 	-X POST \
 	--data "@$ADCM_SETTINGS_FILE" \
-	"$ADCM_ADDRESS/api/v1/adcm/$ADCM_ID/config/history/" 2>&1 1>/dev/null
-echo "Setting updated"
+	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/" 2>&1 1>/dev/null
 
 # Bundles upload
 
@@ -84,8 +66,7 @@ do
     	"$ADCM_ADDRESS/api/v1/stack/load/" 2>&1 1>/dev/null
 done
 
-# Bundles license acceptance
-echo "\nAccepting bundle license"
+echo "Accepting bundle license"
 ids=$(curl --silent \
 		--header "Accept:application/json" \
 		--header "Authorization: Token $token" \
@@ -116,7 +97,7 @@ printf "SSH Common bundle id=%s\n" $sshBundleId
 
 #######################
 # 2. Host/Hostprovider Configuration part
-echo "[phase 3] Hostprovider and hosts configuration"
+echo "[phase 2] Hostprovider and hosts configuration"
 ######################
 
 # Getting host provider prototype (bundle version-related) id
@@ -155,10 +136,9 @@ hostProviderId=$(curl --silent \
 printf "Host provider ready, id=%s\n" $hostProviderId
 
 # Creating hosts
-echo "make sure you specified env variable 'ANSIBLE_USERNAME' and 'ANSIBLE_PASSWORD' without quotes"
 for host in ${HOSTS[@]};
 do
-	printf "Creating host, name/hostname=%s... " $host
+	printf "Creating host, (host)name=%s...\n" $host
 	hostJson="{\"fqdn\": \"$host\"}"
 	hostId=$(curl --silent \
 		--header "Content-Type:application/json" \
@@ -169,12 +149,10 @@ do
 		"$ADCM_ADDRESS/api/v1/provider/$hostProviderId/host/" \
 		| jq -r '.id')
 	if [[ "$hostId" == "null" ]]; then
-		# if hostId is null, other host-related actions are non-functional
-		# possible solution is to get host list and not rely on hostId from method above
-		echo "\nWarning: HOST ALREADY DEFINED, delete host and restart"
-		break
+		printf "\nError: host %s already defined, please delete host and restart installation" $hostId
+		exit 1
 	fi	
-	printf "Host created with id=%s\nChanging host configuration..." $hostId	
+	printf "Changing host (host)name=%s id=$s configuration..." $host $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -222,6 +200,9 @@ do
 			| jq -r '.status')
 			if [[ -n "$status" && "$status" == "success" ]]; then
 				break
+			elif [[ -n "$status" && "$status" == "failed" ]]; then
+				printf "\nError: host %s health checker installation failed. Task id=%s" $hostId $taskId
+				exit 1
 			else
 				echo "."
 				sleep 10 
@@ -230,8 +211,8 @@ do
 done
 
 ############
-#  4 . Cluster Configuration
-echo "[phase 4] Cluster Configuration"
+#  3 . Cluster Configuration
+echo "[phase 3] Cluster Configuration"
 ############
 
 # Creating cluster
@@ -260,12 +241,10 @@ clusterId=$(curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/" \
 	| jq -r '.id')
 if [[ "$clusterId" == "null" ]]; then
-	# if clusterId is null, other host-related actions are non-functional
-	# possible solution is to get host list and not rely on clusterId from method above
-	echo "\nWarning: Cluster ALREADY DEFINED, please delete cluster and restart"
- 		break
+	printf "\nError: cluster %s already defined. Please delete the cluster and restart installation" $clusterId
+	exit 1
 else
-	printf "Cluster created id=%s)\n" $clusterId		
+	printf "Cluster created id=%s\n" $clusterId		
 fi		
 
 # Assign Services to Cluster
@@ -358,8 +337,8 @@ curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/" 2>&1 1>/dev/null
 
 ############
-#  5 . Cluster Installation
-echo "[phase 5] Cluster Installation"
+#  4 . Cluster Installation
+echo "[phase 4] Cluster Installation"
 ############
 actionId=$(curl --silent \
 	--header "Accept:application/json" \
@@ -387,10 +366,10 @@ taskId=$(curl --silent \
 		| jq -r '.status')
 		if [[ -n "$status" && "$status" == "success" ]]; then
 			echo "Installation Completed"
-			break
+			exit 0
 		elif [[ -n "$status" && "$status" == "failed" ]]; then
 			echo "Installation Failed"
-			break
+			exit 1
 		else
 			echo "."
 			sleep 10 
