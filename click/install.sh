@@ -1,19 +1,25 @@
 #!/usr/bin/env sh
 
-ADCM_SETTINGS_FILE=adcmconfig.json
-BUNDLE_NAME_SSH_COMMON="SSH Common"
-BUNDLE_NAME_ADQM="ADQM"
-HOSTPROVIDER_NAME="HostProvider0"
-CLUSTER_NAME="Cluster0"
-SERVICE_NAMES=("adqmdb" "zookeeper")
-ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
-BUNDLES_LOCATION="$(pwd)/bundles"
 PROGRAM_NAME=$(basename $0)
 PROGRAM_VERSION="0.1"
+
+# names ADCM generates for bundles
+BUNDLE_NAME_SSH_COMMON="SSH Common"
+BUNDLE_NAME_ADQM="ADQM"
+
+# Hostprovider name to be defined by this script
+HOSTPROVIDER_NAME="HostProvider0"
+
+# Services to install. 
+# ADQMDB includes 2 components - ClickHouse Server and ClickHouse JDBC bridge
+# Zookeper contains only one component - Zookeeper Server
+SERVICE_NAMES=("adqmdb" "zookeeper")
 
 set -e
 
 function usage {
+	echo "ADCM automation script for ADQMDB (ClickHouse) cluster installation"
+	echo
 	echo "Pre-requisites:"
 	echo "1. Set environment variables ADCM_USERNAME, ADCM_PASSWORD, ANSIBLE_USERNAME, ANSIBLE_PASSWORD. Example:"
 	echo "    export ADCM_USERNAME=admin"
@@ -26,17 +32,25 @@ function usage {
 	echo "$PROGRAM_NAME --arg [value] --"
 	echo
 	echo "Usage example:"
-	echo "$PROGRAM_NAME -a \"http://localhost:8000\" -c \"ch1 ch2 ch3\" --"
+	echo "$PROGRAM_NAME -a http://localhost:8000 -b bundles -c \"ADQM Cluster\" -t \"ch1 ch2 ch3\" --adcm-config adcmconfig.json --adqmdb-config adqmdbconfig.json --"
 	echo
 	echo "Application Arguments:"
-	echo "-a, --adcm-address [value] \n    ADCM container address i.e. \"http://localhost:8000\""
-	echo "-t, --target-hosts [values]\n    Target installation hosts, space separated i.e. \"ch1 ch2 ch3\""
-	echo "--help                     \n    display this help and exit"
-	echo "--version                  \n    show version"
+	echo "-a, --adcm-address [value]     \n    ADCM container address i.e. \"http://localhost:8000\""
+	echo "-b, --bundles-location [value] \n    Bundles directory i.e. \"bundles\""
+	echo "-c, --cluster-name [value]     \n    Cluster name i.e. \"Cluster0\""
+	echo "-t, --target-hosts [values]    \n    Target installation hosts, space separated i.e. \"ch1 ch2 ch3\""
+	echo "--adcm-config [value]		     \n    ADCM Configuration json file path i.e. \"adcmconfig.json\""
+	echo "--adqmdb-config [value]	     \n    ADQMDB Configuration json file path i.e. \"adqmdbconfig.json\""
+	echo "--help                         \n    display this help and exit"
+	echo "--version                      \n    show version"
 	echo
 	echo "Required Arguments (see description above):"
 	echo "-a [value] or --adcm-address [value]"
+	echo "-b [value] or --bundles-location [value]"
+	echo "-c [value] or --cluster-name [value]"
 	echo "-t [value] or --target-hosts [values]"
+	echo "--adcm-config [value]"
+	echo "--adqmdb-config [value]"
 }
 
 function argParseFail {
@@ -53,8 +67,20 @@ while true; do
                 -a|--adcm-address)
                         ADCM_ADDRESS="$2"; shift; shift; continue
                 ;;
+                -b|--bundles-location)
+                        BUNDLES_LOCATION="$2"; shift; shift; continue
+                ;;
+                -c|--cluster-name)
+                        CLUSTER_NAME="$2"; shift; shift; continue
+                ;;
                 -t|--target-hosts)
                         HOSTS=("${2}"); shift; shift; continue
+                ;;   
+                --adcm-config)
+                        ADCM_SETTINGS_FILE="$2"; shift; shift; continue
+                ;;   
+                --adqmdb-config)
+                        ADQMDB_SETTINGS_FILE="$2"; shift; shift; continue
                 ;;                                              
                 -h|--help)                            
                         usage                         
@@ -81,7 +107,8 @@ echo "[phase 0] Self-check"
 ######################
 
 echo "Checking Arguments"
-if [[ -z "$ADCM_ADDRESS" || -z "$HOSTS" ]]; then
+if [[ -z "$ADCM_ADDRESS" || -z "$HOSTS" || -z "$ADCM_SETTINGS_FILE" || -z "$ADQMDB_SETTINGS_FILE" 
+	|| -z "$CLUSTER_NAME" || -z "$BUNDLES_LOCATION" ]]; then
 	argParseFail
 fi
 
@@ -149,9 +176,9 @@ curl --silent \
 	--header "Authorization: Token $token" \
 	-X POST \
 	--data "@$ADCM_SETTINGS_FILE" \
-	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/" 2>&1 1>/dev/null
+	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/"
 
-printf "Preparing bundles from %s \n" $BUNDLES_LOCATION
+printf "\nPreparing bundles from %s \n" $BUNDLES_LOCATION
 WORK_DIR=`mktemp -d`
 cp $BUNDLES_LOCATION/* $WORK_DIR
 rename 's/[ @\$]/_/g' $WORK_DIR/*
@@ -400,7 +427,7 @@ hostIds=$(curl --silent \
  	| jq -r '.results[] | .id')
 for hostId in ${hostIds[@]};
 do
-	printf "Adding host with id=%s to cluster '%s' id=%s\n" $hostId $CLUSTER_NAME $clusterId
+	printf "Adding host with id=%s to cluster '%s' id=%s\n" $hostId "$CLUSTER_NAME" $clusterId
 	curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -420,10 +447,12 @@ componentIds=($(echo $hostComponentJson | jq -r '.component | .[].id'))
 serviceIds=($(echo $hostComponentJson | jq -r '.component | .[].service_id'))
 hostIds=($(echo $hostComponentJson | jq -r '.host | .[].id'))
 hcJsonObjectsArray=()
+# 3 components available for 2 installed services (SERVICE_NAMES)
 for i in 0 1 2
 do
 	componentId=${componentIds[i]}
 	serviceId=${serviceIds[i]}
+	# map all 3 components to all N hosts
 	for hostId in ${hostIds[@]};
 	do
 		hcJsonObjectsArray+=("{\"host_id\":$hostId, \"service_id\":$serviceId, \"component_id\":$componentId}")
