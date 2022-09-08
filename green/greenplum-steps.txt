@@ -93,13 +93,13 @@ change declare -a DATA_DIRECTORY=(/data1/primary /data1/primary /data1/primary /
 with declare -a DATA_DIRECTORY=(/data1/primary)
 
 3)
-touch /home/gpadmin/gpconfigs/hostfile_gpinitsystem
-echo $'sdw1\nsdw2\nsdw3'> /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+touch /home/gpadmin/gpconfigs/hostfile_segments
+echo $'sdw1\nsdw2\nsdw3'> /home/gpadmin/gpconfigs/hostfile_segments
 
 4)
 su gpadmin
 source /usr/local/greenplum-db-6.21.2/greenplum_path.sh
-gpinitsystem -a -c /home/gpadmin/gpconfigs/gpinitsystem_config -h /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+gpinitsystem -a -c /home/gpadmin/gpconfigs/gpinitsystem_config -h /home/gpadmin/gpconfigs/hostfile_segments
 
 systemctl status init_script
 journalctl -u init_script

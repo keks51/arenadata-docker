@@ -9,40 +9,40 @@
 echo "" > /home/gpadmin/.ssh/known_hosts
 
 connect_master_to_segments() {
-  host=$1
+  host_to_connect=$1
   s="failed"
-      log "Master: Connecting to ${host}"
-      for i in {1..10}; do ssh -o StrictHostKeyChecking=no $host < /dev/null && s="success" && break || sleep 1; done
-      if [[ "$s" == "success" ]]; then
-        log "Master: Connected to ${host}"
+  log "MASTER: Connecting to ${host_to_connect}"
+  for i in {1..10}; do ssh -o StrictHostKeyChecking=no $host_to_connect < /dev/null && s="success" && break || sleep 1; done
+  if [[ "$s" == "success" ]]; then
+    log "MASTER: Connected to ${host_to_connect}"
 
-        scp /home/gpadmin/gpconfigs/hostfile_gpinitsystem $host:/home/gpadmin/gpconfigs/hostfile_gpinitsystem
-        log "Master: Copied file /home/gpadmin/gpconfigs/hostfile_gpinitsystem to ${host}"
+    scp /home/gpadmin/gpconfigs/hostfile_segments "$host_to_connect":/home/gpadmin/gpconfigs/hostfile_segments
+    log "MASTER: Copied file /home/gpadmin/gpconfigs/hostfile_segments to ${host_to_connect}"
 
-        ssh ${host} 'bash /home/gpadmin/init_ssh.sh < /dev/null' < /dev/null
-        log "Master: Executed init_ssh.sh on ${host}"
+    (ssh "${host_to_connect}" 'bash /home/gpadmin/init_ssh.sh < /dev/null' | sudo tee -a /proc/1/fd/1) < /dev/null
+    log "MASTER: Executed init_ssh.sh on ${host_to_connect}"
 
-        ssh ${host} "ssh -o StrictHostKeyChecking=no ${master_hostname} < /dev/null" < /dev/null
-        log "Master: Connected to ${master_hostname} from ${host}"
-        return 0
-      else
-        log "Master: Cannot connect to ${host}"
-        return 1
-      fi
+    ssh "${host_to_connect}" "ssh -o StrictHostKeyChecking=no ${master_hostname} < /dev/null" < /dev/null
+    log "MASTER: Connected to ${master_hostname} from ${host_to_connect}"
+    return 0
+  else
+    log "MASTER: Cannot connect to ${host_to_connect}"
+    return 1
+  fi
 }
 
 connect_segment_to_all() {
   segment_hostname=$1
-  host=$2
+  host_to_connect=$2
   s="failed"
-      log "Segment: ${segment_hostname} connecting to ${host}"
-      for i in {1..10}; do ssh -o StrictHostKeyChecking=no $host < /dev/null && s="success" && break || sleep 1; done
-      if [[ "$s" == "success" ]]; then
-        log "Segment: ${segment_hostname} connected to ${host}"
-      else
-        log "Segment: ${segment_hostname} ${host}"
-        exit 1
-      fi
+  log "SEGMENT: ${segment_hostname} connecting to ${host_to_connect}"
+  for i in {1..10}; do ssh -o StrictHostKeyChecking=no "$host_to_connect" < /dev/null && s="success" && break || sleep 1; done
+  if [[ "$s" == "success" ]]; then
+    log "SEGMENT: ${segment_hostname} connected to ${host_to_connect}"
+  else
+    log "SEGMENT: ${segment_hostname} ${host_to_connect}"
+    exit 1
+  fi
 }
 
 log() {
@@ -56,27 +56,30 @@ log() {
 if [[ "$1" == "master_node" ]]; then
   master_hostname=$(hostname)
   ssh -o StrictHostKeyChecking=no $master_hostname < /dev/null
-  log "Master: Added master host ${master_hostname}"
-  while read host || [ -n "$host" ]
+  log "MASTER: Added master host_to_connect ${master_hostname} to known_hosts"
+  while read host_to_connect || [ -n "$host_to_connect" ]
   do
-    res=$(connect_master_to_segments "$host")
+    res=$(connect_master_to_segments "$host_to_connect")
     if [ "$res" -eq "1" ]; then exit 1; fi
-  done < /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+  done < /home/gpadmin/gpconfigs/hostfile_segments
   if [ -n "$STANDBY_HOSTNAME"  ] && [ -n "$STANDBY_PORT"  ]; then
-    log "Connecting to Standby node"
+    log "MASTER: Connecting to Standby node"
     res=$(connect_master_to_segments "$STANDBY_HOSTNAME")
     ssh "$STANDBY_HOSTNAME" "ssh -o StrictHostKeyChecking=no ${STANDBY_HOSTNAME} < /dev/null" < /dev/null
     ssh "$STANDBY_HOSTNAME" "ssh -o StrictHostKeyChecking=no ${master_hostname} < /dev/null" < /dev/null
     if [ "$res" -eq "1" ]; then exit 1; fi
   else
-    log "Standby host or port in not configured. Skipping"
+    log "MASTER: Standby host_to_connect or port in not configured. Skipping"
   fi
+  log "MASTER: All nodes successfully connected"
 else
+  # executed on segment
   segment_hostname=$(hostname)
-  while read host || [ -n "$host" ]; do
-    res=$(connect_segment_to_all "$segment_hostname" "$host")
-    if [ "$res" -eq "1" ]; then exit 1; fi
-  done < /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+  log "SEGMENT: '${segment_hostname}' configuring ssh"
+  while read host_to_connect || [ -n "$host_to_connect" ]; do
+    connect_segment_to_all "$segment_hostname" "$host_to_connect"
+    res=$(connect_segment_to_all "$segment_hostname" "$host_to_connect")
+    if [ "$res" -eq "1" ]; then log "failed"; exit 1; fi
+  done < /home/gpadmin/gpconfigs/hostfile_segments
+  log "SEGMENT: '${segment_hostname}' All nodes successfully connected"
 fi
-
-log "All nodes successfully connected"

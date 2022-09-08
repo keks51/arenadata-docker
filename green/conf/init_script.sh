@@ -10,16 +10,26 @@ mkdir -p /data/mirror
 mkdir -p /data/master
 chown -R gpadmin:gpadmin /data/*
 
-echo "\nSegments are ${SEGMENT_HOSTNAMES}" | sudo tee -a /proc/1/fd/1
-echo ${SEGMENT_HOSTNAMES} | sed "s/,/\n/g" > /home/gpadmin/gpconfigs/hostfile_gpinitsystem
+echo "MASTER: Segments are ${SEGMENT_HOSTNAMES}" | sudo tee -a /proc/1/fd/1
+echo "${SEGMENT_HOSTNAMES}" | sed "s/,/\n/g" > /home/gpadmin/gpconfigs/hostfile_segments
 
-echo "\nOverriding conf with env variables" | sudo tee -a /proc/1/fd/1
+echo "MASTER: Overriding greenplum conf with env variables" | sudo tee -a /proc/1/fd/1
 su gpadmin -s /home/gpadmin/override_conf.sh
 
-echo "\nConfiguring ssh connections" | sudo tee -a /proc/1/fd/1
+echo "MASTER: Configuring ssh connections" | sudo tee -a /proc/1/fd/1
 su gpadmin -s /home/gpadmin/init_ssh.sh "master_node"
 
-echo "\nStarting db" | sudo tee -a /proc/1/fd/1
+echo "MASTER: Starting db" | sudo tee -a /proc/1/fd/1
 su gpadmin -s /home/gpadmin/start_db.sh
 
+echo "MASTER: Replacing ip addresses in pg_hba.conf" | sudo tee -a /proc/1/fd/1
+su gpadmin -s /home/gpadmin/replace_pg_hba.sh
 
+if [[ $START_PXF == "true" ]]; then
+  echo "MASTER: Starting PXF server on all nodes" | sudo tee -a /proc/1/fd/1
+  su gpadmin -s /home/gpadmin/start_pxf.sh "master_node"
+else
+  echo "MASTER: Skipping PXF" | sudo tee -a /proc/1/fd/1
+fi
+
+echo "MASTER: Init script successfully finished" | sudo tee -a /proc/1/fd/1

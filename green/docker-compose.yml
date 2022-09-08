@@ -26,6 +26,7 @@ services:
       - STANDBY_HOSTNAME=mdw-standby
       - STANDBY_PORT=5432
       - STANDBY_DIRECTORY=/data/standby_master
+      - START_PXF=true
     volumes:
       - ./volume/mdw/:/data/
   mdw-standby:
