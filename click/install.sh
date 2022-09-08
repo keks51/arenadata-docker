@@ -14,6 +14,46 @@ BUNDLES_LOCATION="$(pwd)/bundles"
 
 set -e
 
+#######################
+# 0. ADCM Configuration part
+echo "[phase 0] Self-check"
+######################
+
+echo "Checking dependencies"
+if ! command -v jq &> /dev/null
+then
+    echo "'jq' could not be found"
+    exit
+fi
+if ! command -v curl &> /dev/null
+then
+    echo "'curl' could not be found"
+    exit
+fi
+if ! command -v mktemp &> /dev/null
+then
+    echo "'mktemp' could not be found"
+    exit
+fi
+
+echo "Checking env. variables"
+if [[ -z "$ADCM_USERNAME" ]]; then
+	echo "ADCM_USERNAME env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ADCM_PASSWORD" ]]; then
+	echo "ADCM_PASSWORD env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ANSIBLE_USERNAME" ]]; then
+	echo "ANSIBLE_USERNAME env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ANSIBLE_PASSWORD" ]]; then
+	echo "ANSIBLE_PASSWORD env. variable is not set"
+	exit 1
+fi
+
 printf "Waiting for ADCM / Gettting auth. token (%s)...\n" $ADCM_ADDRESS
 while true
 do
