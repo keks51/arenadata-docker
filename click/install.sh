@@ -5,7 +5,6 @@ BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
 HOSTPROVIDER_NAME="HostProvider0"
 CLUSTER_NAME="Cluster0"
-HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 BUNDLES_LOCATION="$(pwd)/bundles"
@@ -27,15 +26,17 @@ function usage {
 	echo "$PROGRAM_NAME --arg [value] --"
 	echo
 	echo "Usage example:"
-	echo "$PROGRAM_NAME -a http://localhost:8000 --"
+	echo "$PROGRAM_NAME -a \"http://localhost:8000\" -c \"ch1 ch2 ch3\" --"
 	echo
 	echo "Application Arguments:"
-	echo "-a, --adcm-address [value] \n    ADCM container address i.e. http://localhost:8000"
+	echo "-a, --adcm-address [value] \n    ADCM container address i.e. \"http://localhost:8000\""
+	echo "-t, --target-hosts [values]\n    Target installation hosts, space separated i.e. \"ch1 ch2 ch3\""
 	echo "--help                     \n    display this help and exit"
 	echo "--version                  \n    show version"
 	echo
 	echo "Required Arguments (see description above):"
 	echo "-a [value] or --adcm-address [value]"
+	echo "-t [value] or --target-hosts [values]"
 }
 
 function argParseFail {
@@ -51,7 +52,10 @@ while true; do
         case $1 in 
                 -a|--adcm-address)
                         ADCM_ADDRESS="$2"; shift; shift; continue
-                ;;                                    
+                ;;
+                -t|--target-hosts)
+                        HOSTS=("${2}"); shift; shift; continue
+                ;;                                              
                 -h|--help)                            
                         usage                         
                         exit 0                        
@@ -71,14 +75,13 @@ while true; do
         esac                                                                        
 done     
 
-
 #######################
 # 0. Self-check
 echo "[phase 0] Self-check"
 ######################
 
-echo "Checking Arguments "
-if [[ -z "$ADCM_ADDRESS" ]]; then
+echo "Checking Arguments"
+if [[ -z "$ADCM_ADDRESS" || -z "$HOSTS" ]]; then
 	argParseFail
 fi
 
@@ -245,7 +248,7 @@ printf "Host provider ready, id=%s\n" $hostProviderId
 # Creating hosts
 for host in ${HOSTS[@]};
 do
-	printf "Creating host \"%s\"\n" $host
+	printf "Creating host %s'\n" $host
 	hostJson="{\"fqdn\": \"$host\"}"
 	hostId=$(curl --silent \
 		--header "Content-Type:application/json" \
@@ -256,10 +259,10 @@ do
 		"$ADCM_ADDRESS/api/v1/provider/$hostProviderId/host/" \
 		| jq -r '.id')
 	if [[ "$hostId" == "null" ]]; then
-		printf "\nError: host %s already defined, please delete host and restart installation" $hostId
+		printf "\nError: host '%s' already defined" $host
 		exit 1
 	fi	
-	printf "Changing host \"%s\" id=%s configuration\n" $host $hostId	
+	printf "Changing host '%s' id=%s configuration\n" $host $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -308,7 +311,7 @@ do
 			if [[ -n "$status" && "$status" == "success" ]]; then
 				break
 			elif [[ -n "$status" && "$status" == "failed" ]]; then
-				printf "\nError: host %s health checker installation failed. Task id=%s" $hostId $taskId
+				printf "\nError: host '%s' id=%s health checker installation failed. Task id=%s" $host $hostId $taskId
 				exit 1
 			else
 				echo "."
@@ -348,10 +351,10 @@ clusterId=$(curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/" \
 	| jq -r '.id')
 if [[ "$clusterId" == "null" ]]; then
-	printf "\nError: cluster %s already defined. Please delete the cluster and restart installation" $clusterId
+	printf "\nError: cluster '%s' already defined" $CLUSTER_NAME
 	exit 1
 else
-	printf "Cluster created id=%s\n" $clusterId		
+	printf "Cluster '%s' created id=%s\n" $CLUSTER_NAME $clusterId		
 fi		
 
 # Assign Services to Cluster
@@ -397,7 +400,7 @@ hostIds=$(curl --silent \
  	| jq -r '.results[] | .id')
 for hostId in ${hostIds[@]};
 do
-	printf "Adding host with id=%s to cluster $clusterId\n" $hostId
+	printf "Adding host with id=%s to cluster '%s' id=%s\n" $hostId $CLUSTER_NAME $clusterId
 	curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
