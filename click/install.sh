@@ -46,8 +46,10 @@ curl --silent \
 	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/" 2>&1 1>/dev/null
 
 printf "Preparing bundles from %s \n" $BUNDLES_LOCATION
-rename 's/[ @\$]/_/g' $BUNDLES_LOCATION/*
-find $BUNDLES_LOCATION -type f -print0 | while IFS="" read -r -d "" fullFileName
+WORK_DIR=`mktemp -d`
+cp $BUNDLES_LOCATION/* $WORK_DIR
+rename 's/[ @\$]/_/g' $WORK_DIR/*
+find $WORK_DIR -type f -print0 | while IFS="" read -r -d "" fullFileName
 do
 	printf "uploading bundle \"%s\"\n" $fullFileName
 	curl \
@@ -68,6 +70,7 @@ do
 		--data "{\"bundle_file\" : \"$baseFileName\" }" \
 		"$ADCM_ADDRESS/api/v1/stack/load/"
 done
+rm -rf $WORK_DIR
 
 echo "\nAccepting bundle license"
 ids=$(curl --silent \
