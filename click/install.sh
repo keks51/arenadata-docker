@@ -1,34 +1,153 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
-ADCM_ADDRESS="http://localhost:8000"
-ADCM_ID=1
-ADCM_SETTINGS_FILE=adcmconfig.json
+PROGRAM_NAME=$(basename $0)
+PROGRAM_VERSION="0.1"
+
+# names ADCM generates for bundles
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
+
+# Hostprovider name to be defined by this script
 HOSTPROVIDER_NAME="HostProvider0"
-CLUSTER_NAME="Cluster0"
-HOSTS=("ch1" "ch2" "ch3") # host name == host id
+
+# Services to install. 
+# ADQMDB includes 2 components - ClickHouse Server and ClickHouse JDBC bridge
+# Zookeper contains only one component - Zookeeper Server
 SERVICE_NAMES=("adqmdb" "zookeeper")
-ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
 
-# #####################
-# 1. Prepare containers and get access token
-echo "[phase 1] System restart, waiting for token"
-# #####################
+set -e
 
-echo "stopping ADCM and nodes ..."
-docker compose stop
-docker compose rm -f
-echo "ADCM and nodes stopped"
+function usage {
+	echo "ADCM automation script for ADQMDB (ClickHouse) cluster installation"
+	echo
+	echo "Pre-requisites:"
+	echo "1. Set environment variables ADCM_USERNAME, ADCM_PASSWORD, ANSIBLE_USERNAME, ANSIBLE_PASSWORD. Example:"
+	echo "    export ADCM_USERNAME=admin"
+	echo "2. Make sure dependencies installed: curl, jq, mktemp"
+	echo "3. Save bundles into 'bundles' subfolder located next to $PROGRAM_NAME"
+	echo "    Bundles required: 'adcm_host_ssh<...>.tgz', 'adcm_cluster_adqm<...>.tgz'"
+	echo "4. Make sure ADCM and target installation hosts are up and running"
+	echo 
+	echo "Usage:"
+	echo "$PROGRAM_NAME --arg [value] --"
+	echo
+	echo "Usage example:"
+	echo "$PROGRAM_NAME -a http://localhost:8000 -b bundles -c \"ADQM Cluster\" -t \"ch1 ch2 ch3\" --adcm-config adcmconfig.json --adqmdb-config adqmdbconfig.json --"
+	echo
+	echo "Application Arguments:"
+	echo "-a, --adcm-address [value]     \n    ADCM container address i.e. \"http://localhost:8000\""
+	echo "-b, --bundles-location [value] \n    Bundles directory i.e. \"bundles\""
+	echo "-c, --cluster-name [value]     \n    Cluster name i.e. \"Cluster0\""
+	echo "-t, --target-hosts [values]    \n    Target installation hosts, space separated i.e. \"ch1 ch2 ch3\""
+	echo "--adcm-config [value]		     \n    ADCM Configuration json file path i.e. \"adcmconfig.json\""
+	echo "--adqmdb-config [value]	     \n    ADQMDB Configuration json file path i.e. \"adqmdbconfig.json\""
+	echo "--help                         \n    display this help and exit"
+	echo "--version                      \n    show version"
+	echo
+	echo "Required Arguments (see description above):"
+	echo "-a [value] or --adcm-address [value]"
+	echo "-b [value] or --bundles-location [value]"
+	echo "-c [value] or --cluster-name [value]"
+	echo "-t [value] or --target-hosts [values]"
+	echo "--adcm-config [value]"
+	echo "--adqmdb-config [value]"
+}
 
-echo "Building node images..."
-docker build -t keks51-centos7 -f Dockerfile .
-echo "ADCM node images ready"
+function argParseFail {
+	echo "Error parsing arguments. Try $PROGRAM_NAME --help"       
+	exit 1
+}
 
-docker compose up -d
+if [ -z $1 ] 
+then
+	argParseFail
+fi
+while true; do     
+        case $1 in 
+                -a|--adcm-address)
+                        ADCM_ADDRESS="$2"; shift; shift; continue
+                ;;
+                -b|--bundles-location)
+                        BUNDLES_LOCATION="$2"; shift; shift; continue
+                ;;
+                -c|--cluster-name)
+                        CLUSTER_NAME="$2"; shift; shift; continue
+                ;;
+                -t|--target-hosts)
+                        HOSTS=("${2}"); shift; shift; continue
+                ;;   
+                --adcm-config)
+                        ADCM_SETTINGS_FILE="$2"; shift; shift; continue
+                ;;   
+                --adqmdb-config)
+                        ADQMDB_SETTINGS_FILE="$2"; shift; shift; continue
+                ;;                                              
+                -h|--help)                            
+                        usage                         
+                        exit 0                        
+                ;;                                    
+                -v|--version)                                   
+                        printf "%s, version %s\n" "$PROGRAM_NAME" "$PROGRAM_VERSION"
+                        exit 0                                                      
+                ;;                                                                  
+                --)                                                                 
+                        # no more arguments to parse                                
+                        break                                                       
+                ;;                                                                  
+                *)                                                                  
+                        printf "Unknown option %s\n" "$1"                           
+                        exit 1                                                      
+                ;;                                                                  
+        esac                                                                        
+done     
 
-echo "Gettting auth. token"
-echo "make sure you specified env variable 'ADCM_USERNAME' and 'ADCM_PASSWORD' without quotes"
+#######################
+# 0. Self-check
+echo "[phase 0] Self-check"
+######################
+
+echo "Checking Arguments"
+if [[ -z "$ADCM_ADDRESS" || -z "$HOSTS" || -z "$ADCM_SETTINGS_FILE" || -z "$ADQMDB_SETTINGS_FILE" 
+	|| -z "$CLUSTER_NAME" || -z "$BUNDLES_LOCATION" ]]; then
+	argParseFail
+fi
+
+echo "Checking dependencies"
+if ! command -v jq &> /dev/null
+then
+    echo "'jq' could not be found"
+    exit
+fi
+if ! command -v curl &> /dev/null
+then
+    echo "'curl' could not be found"
+    exit
+fi
+if ! command -v mktemp &> /dev/null
+then
+    echo "'mktemp' could not be found"
+    exit
+fi
+
+echo "Checking env. variables"
+if [[ -z "$ADCM_USERNAME" ]]; then
+	echo "ADCM_USERNAME env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ADCM_PASSWORD" ]]; then
+	echo "ADCM_PASSWORD env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ANSIBLE_USERNAME" ]]; then
+	echo "ANSIBLE_USERNAME env. variable is not set"
+	exit 1
+fi
+if [[ -z "$ANSIBLE_PASSWORD" ]]; then
+	echo "ANSIBLE_PASSWORD env. variable is not set"
+	exit 1
+fi
+
+printf "Waiting for ADCM / Gettting auth. token (%s)...\n" $ADCM_ADDRESS
 while true
 do
 	token=$(curl --silent --header "Content-Type:application/json" \
@@ -41,50 +160,51 @@ do
 		break
 	else
 		echo "."
-		sleep 1 
+		sleep 5 
 	fi
 done
-printf "ADCM ( %s ) is UP and token received\n" $ADCM_ADDRESS
 
 #######################
-# 2. ADCM Configuration part
-echo "[phase 2] ADCM configuration"
+# 1. ADCM Configuration part
+echo "[phase 1] ADCM configuration"
 ######################
-printf "Applying configuration file %s\n" $ADCM_SETTINGS_FILE
+
+printf "Applying configuration file %s...\n" $ADCM_SETTINGS_FILE
 curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
 	--header "Authorization: Token $token" \
 	-X POST \
 	--data "@$ADCM_SETTINGS_FILE" \
-	"$ADCM_ADDRESS/api/v1/adcm/$ADCM_ID/config/history/" 2>&1 1>/dev/null
-echo "Setting updated"
+	"$ADCM_ADDRESS/api/v1/adcm/1/config/history/"
 
-# Bundles upload
-
-cd bundles
-
-for f in *;
+printf "\nPreparing bundles from %s \n" $BUNDLES_LOCATION
+WORK_DIR=`mktemp -d`
+cp $BUNDLES_LOCATION/* $WORK_DIR
+rename 's/[ @\$]/_/g' $WORK_DIR/*
+find $WORK_DIR -type f -print0 | while IFS="" read -r -d "" fullFileName
 do
-    printf "uploading bundle ( %s )\n" $f
-    curl  --silent \
-    	--header "Authorization: Token $token" \
-    	--header "Accept-Encoding: gzip,deflate" \
-    	--header "Accept: application/json, text/plain, */*" \
-    	--header "Connection: keep-alive" \
-    	-F file=@$f \
-    	-X POST \
-    	"$ADCM_ADDRESS/api/v1/stack/upload/" 2>&1 1>/dev/null
-    curl  --silent \
-    	--header "Content-Type:application/json" \
-    	--header "application/json, text/plain, */*" \
-    	--header "Authorization: Token $token" \
-    	-X POST \
-    	--data '{"bundle_file":"'$f'"}' \
-    	"$ADCM_ADDRESS/api/v1/stack/load/" 2>&1 1>/dev/null
+	printf "uploading bundle \"%s\"\n" $fullFileName
+	curl \
+		--header "Authorization: Token $token" \
+		--header "Accept: application/json, text/plain, */*" \
+		--header "Connection: keep-alive" \
+		--header "Content-Type: multipart/form-data" \
+		-F file=@"$fullFileName" \
+		-X POST \
+		"$ADCM_ADDRESS/api/v1/stack/upload/" 
+	baseFileName="$(basename -- $fullFileName)"
+	printf "\nloading bundle \"%s\"\n" $baseFileName
+	curl \
+		--header "Content-Type:application/json" \
+		--header "application/json, text/plain, */*" \
+		--header "Authorization: Token $token" \
+		-X POST \
+		--data "{\"bundle_file\" : \"$baseFileName\" }" \
+		"$ADCM_ADDRESS/api/v1/stack/load/"
 done
+rm -rf $WORK_DIR
 
-# Bundles license acceptance
 echo "\nAccepting bundle license"
 ids=$(curl --silent \
 		--header "Accept:application/json" \
@@ -102,21 +222,10 @@ do
 	"$ADCM_ADDRESS/api/v1/stack/bundle/$id/license/accept/"
 done
 
-# Getting SSH Common bundle id
-sshBundleId=$(curl --silent \
-		--header "Accept:application/json" \
-		--header "Authorization: Token $token" \
-	 	-X GET \
-	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
-	 	| jq --arg name "$BUNDLE_NAME_SSH_COMMON" -r \
-	 		'.results[] | select(.name==$name) | .id')
-
-printf "SSH Common bundle id=%s\n" $sshBundleId
-
 
 #######################
 # 2. Host/Hostprovider Configuration part
-echo "[phase 3] Hostprovider and hosts configuration"
+echo "[phase 2] Hostprovider and hosts configuration"
 ######################
 
 # Getting host provider prototype (bundle version-related) id
@@ -125,8 +234,15 @@ hostProviderPrototypeId=$(curl --silent \
 		--header "Authorization: Token $token" \
 	 	-X GET \
 	 	"$ADCM_ADDRESS/api/v1/stack/provider/?page=0&limit=500" \
-	 	| jq -r '.results[] | select(.id=98) | .id')
-printf "Prototype id=%s)\n" $hostProviderPrototypeId
+	 	| jq -r '.results[0] | .id')
+
+sshBundleId=$(curl --silent \
+		--header "Accept:application/json" \
+		--header "Authorization: Token $token" \
+	 	-X GET \
+	 	"$ADCM_ADDRESS/api/v1/stack/bundle/?offset=0" \
+	 	| jq --arg name "$BUNDLE_NAME_SSH_COMMON" -r \
+	 		'.results[] | select(.name==$name) | .id')
 
 # Creating hostprovider
 echo "Creating host provider"
@@ -136,6 +252,8 @@ hostProviderJson="{ \
 	\"display_name\": 	\"$BUNDLE_NAME_SSH_COMMON\", \
 	\"bundle_id\": 		\"$sshBundleId\" \
 }"
+echo "Json:"
+echo $hostProviderJson
 curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -155,10 +273,9 @@ hostProviderId=$(curl --silent \
 printf "Host provider ready, id=%s\n" $hostProviderId
 
 # Creating hosts
-echo "make sure you specified env variable 'ANSIBLE_USERNAME' and 'ANSIBLE_PASSWORD' without quotes"
 for host in ${HOSTS[@]};
 do
-	printf "Creating host, name/hostname=%s... " $host
+	printf "Creating host %s'\n" $host
 	hostJson="{\"fqdn\": \"$host\"}"
 	hostId=$(curl --silent \
 		--header "Content-Type:application/json" \
@@ -169,12 +286,10 @@ do
 		"$ADCM_ADDRESS/api/v1/provider/$hostProviderId/host/" \
 		| jq -r '.id')
 	if [[ "$hostId" == "null" ]]; then
-		# if hostId is null, other host-related actions are non-functional
-		# possible solution is to get host list and not rely on hostId from method above
-		echo "\nWarning: HOST ALREADY DEFINED, delete host and restart"
-		break
+		printf "\nError: host '%s' already defined" $host
+		exit 1
 	fi	
-	printf "Host created with id=%s\nChanging host configuration..." $hostId	
+	printf "Changing host '%s' id=%s configuration\n" $host $hostId	
 	hostConfigJson="{ \
 		\"config\":{ \
 			\"ansible_user\"					:\"$ANSIBLE_USERNAME\", \
@@ -210,7 +325,7 @@ do
 		--data "{\"verbose\":false}" \
 		"$ADCM_ADDRESS/api/v1/host/$hostId/action/$actionId/run/" \
 		| jq -r '.id')
-		echo "Status checker installation started, task id=$taskId"	
+		printf "Status checker installation started, task id=%s...\n" $taskId
 	 	while true
 		do
 			status=$(curl --silent \
@@ -222,6 +337,9 @@ do
 			| jq -r '.status')
 			if [[ -n "$status" && "$status" == "success" ]]; then
 				break
+			elif [[ -n "$status" && "$status" == "failed" ]]; then
+				printf "\nError: host '%s' id=%s health checker installation failed. Task id=%s" $host $hostId $taskId
+				exit 1
 			else
 				echo "."
 				sleep 10 
@@ -230,8 +348,8 @@ do
 done
 
 ############
-#  4 . Cluster Configuration
-echo "[phase 4] Cluster Configuration"
+#  3 . Cluster Configuration
+echo "[phase 3] Cluster Configuration"
 ############
 
 # Creating cluster
@@ -260,12 +378,10 @@ clusterId=$(curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/" \
 	| jq -r '.id')
 if [[ "$clusterId" == "null" ]]; then
-	# if clusterId is null, other host-related actions are non-functional
-	# possible solution is to get host list and not rely on clusterId from method above
-	echo "\nWarning: Cluster ALREADY DEFINED, please delete cluster and restart"
- 		break
+	printf "\nError: cluster '%s' already defined" $CLUSTER_NAME
+	exit 1
 else
-	printf "Cluster created id=%s)\n" $clusterId		
+	printf "Cluster '%s' created id=%s\n" $CLUSTER_NAME $clusterId		
 fi		
 
 # Assign Services to Cluster
@@ -287,8 +403,6 @@ do
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/service/" 2>&1 1>/dev/null
 done
 echo "Configuring ADQMDB cluster service"
-
-cd ..
 
 adqmdbClusterServiceId=$(curl --silent \
 	--header "Accept:application/json" \
@@ -313,7 +427,7 @@ hostIds=$(curl --silent \
  	| jq -r '.results[] | .id')
 for hostId in ${hostIds[@]};
 do
-	printf "Adding host with id=%s to cluster $clusterId\n" $hostId
+	printf "Adding host with id=%s to cluster '%s' id=%s\n" $hostId "$CLUSTER_NAME" $clusterId
 	curl --silent \
 	--header "Content-Type:application/json" \
 	--header "Accept:application/json" \
@@ -333,10 +447,12 @@ componentIds=($(echo $hostComponentJson | jq -r '.component | .[].id'))
 serviceIds=($(echo $hostComponentJson | jq -r '.component | .[].service_id'))
 hostIds=($(echo $hostComponentJson | jq -r '.host | .[].id'))
 hcJsonObjectsArray=()
+# 3 components available for 2 installed services (SERVICE_NAMES)
 for i in 0 1 2
 do
 	componentId=${componentIds[i]}
 	serviceId=${serviceIds[i]}
+	# map all 3 components to all N hosts
 	for hostId in ${hostIds[@]};
 	do
 		hcJsonObjectsArray+=("{\"host_id\":$hostId, \"service_id\":$serviceId, \"component_id\":$componentId}")
@@ -358,8 +474,8 @@ curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/" 2>&1 1>/dev/null
 
 ############
-#  5 . Cluster Installation
-echo "[phase 5] Cluster Installation"
+#  4 . Cluster Installation
+echo "[phase 4] Cluster Installation"
 ############
 actionId=$(curl --silent \
 	--header "Accept:application/json" \
@@ -387,10 +503,10 @@ taskId=$(curl --silent \
 		| jq -r '.status')
 		if [[ -n "$status" && "$status" == "success" ]]; then
 			echo "Installation Completed"
-			break
+			exit 0
 		elif [[ -n "$status" && "$status" == "failed" ]]; then
 			echo "Installation Failed"
-			break
+			exit 1
 		else
 			echo "."
 			sleep 10 
