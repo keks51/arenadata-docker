@@ -98,7 +98,7 @@ hostProviderPrototypeId=$(curl --silent \
 		--header "Authorization: Token $token" \
 	 	-X GET \
 	 	"$ADCM_ADDRESS/api/v1/stack/provider/?page=0&limit=500" \
-	 	| jq -r '.results[] | select(.id=98) | .id')
+	 	| jq -r '.results[0] | .id')
 
 sshBundleId=$(curl --silent \
 		--header "Accept:application/json" \
