@@ -9,7 +9,7 @@ docker image rm arenadata/adcm
 
 echo "Cleaning ADCM volume directory"
 # volume directory name specified in docker-compose.yml
-rm -rf volume
+rm -rf volume/adcm
 
 echo "Building node images..."
 docker build -t keks51-centos7 -f Dockerfile .
