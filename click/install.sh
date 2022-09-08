@@ -1,6 +1,5 @@
 #!/usr/bin/env sh
 
-ADCM_ADDRESS="http://localhost:8000"
 ADCM_SETTINGS_FILE=adcmconfig.json
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
@@ -9,15 +8,79 @@ CLUSTER_NAME="Cluster0"
 HOSTS=("ch1" "ch2" "ch3") # host name == host id
 SERVICE_NAMES=("adqmdb" "zookeeper")
 ADQMDB_SETTINGS_FILE="adqmdbconfig.json"
-# Files inside this names will be automatically renamed to avodi special characters
 BUNDLES_LOCATION="$(pwd)/bundles"
+PROGRAM_NAME=$(basename $0)
+PROGRAM_VERSION="0.1"
 
 set -e
 
+function usage {
+	echo "Pre-requisites:"
+	echo "1. Set environment variables ADCM_USERNAME, ADCM_PASSWORD, ANSIBLE_USERNAME, ANSIBLE_PASSWORD. Example:"
+	echo "    export ADCM_USERNAME=admin"
+	echo "2. Make sure dependencies installed: curl, jq, mktemp"
+	echo "3. Save bundles into 'bundles' subfolder located next to $PROGRAM_NAME"
+	echo "    Bundles required: 'adcm_host_ssh<...>.tgz', 'adcm_cluster_adqm<...>.tgz'"
+	echo "4. Make sure ADCM and target installation hosts are up and running"
+	echo 
+	echo "Usage:"
+	echo "$PROGRAM_NAME --arg [value] --"
+	echo
+	echo "Usage example:"
+	echo "$PROGRAM_NAME -a http://localhost:8000 --"
+	echo
+	echo "Application Arguments:"
+	echo "-a, --adcm-address [value] \n    ADCM container address i.e. http://localhost:8000"
+	echo "--help                     \n    display this help and exit"
+	echo "--version                  \n    show version"
+	echo
+	echo "Required Arguments (see description above):"
+	echo "-a [value] or --adcm-address [value]"
+}
+
+function argParseFail {
+	echo "Error parsing arguments. Try $PROGRAM_NAME --help"       
+	exit 1
+}
+
+if [ -z $1 ] 
+then
+	argParseFail
+fi
+while true; do     
+        case $1 in 
+                -a|--adcm-address)
+                        ADCM_ADDRESS="$2"; shift; shift; continue
+                ;;                                    
+                -h|--help)                            
+                        usage                         
+                        exit 0                        
+                ;;                                    
+                -v|--version)                                   
+                        printf "%s, version %s\n" "$PROGRAM_NAME" "$PROGRAM_VERSION"
+                        exit 0                                                      
+                ;;                                                                  
+                --)                                                                 
+                        # no more arguments to parse                                
+                        break                                                       
+                ;;                                                                  
+                *)                                                                  
+                        printf "Unknown option %s\n" "$1"                           
+                        exit 1                                                      
+                ;;                                                                  
+        esac                                                                        
+done     
+
+
 #######################
-# 0. ADCM Configuration part
+# 0. Self-check
 echo "[phase 0] Self-check"
 ######################
+
+echo "Checking Arguments "
+if [[ -z "$ADCM_ADDRESS" ]]; then
+	argParseFail
+fi
 
 echo "Checking dependencies"
 if ! command -v jq &> /dev/null
