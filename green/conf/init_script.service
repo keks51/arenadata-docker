@@ -2,8 +2,7 @@
 Description=My Shell Script
 
 [Service]
-ExecStart=/init_script.sh
-Environment=SEGMENTS=$SEGMENTS
+ExecStart=/start.sh
 
 [Install]
 WantedBy=multi-user.target

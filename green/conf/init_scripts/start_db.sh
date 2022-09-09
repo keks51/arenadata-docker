@@ -2,7 +2,7 @@
 
 log() {
   mes=$1
-  echo "$mes" | sudo tee -a /proc/1/fd/1
+  echo "start_db.sh| $mes" | sudo tee -a /proc/1/fd/1
 }
 
 source /usr/local/greenplum-db-6.21.2/greenplum_path.sh
@@ -40,7 +40,14 @@ else
 
   fi
   log "MASTER: Creating default db 'gpadmin'"
-  createdb -h $master_hostname -p $master_port gpadmin | sudo tee -a /proc/1/fd/1
+  createdb -h "$master_hostname" -p "$master_port" gpadmin | sudo tee -a /proc/1/fd/1
 fi
 
 log "MASTER: Greenplum Database has started"
+
+#gpinitsystem -a \
+#      -c /home/gpadmin/gpconfigs/gpinitsystem_config \
+#      -h /home/gpadmin/gpconfigs/hostfile_segments \
+#      -P 5432 \
+#      -s mdw-standby \
+#      -S /data/standby_master

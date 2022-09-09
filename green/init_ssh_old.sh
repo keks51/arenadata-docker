@@ -6,7 +6,12 @@
 # -connect to master from segment
 #If segment:
 # -connect to each segment
-echo "" > /home/gpadmin/.ssh/known_hosts
+#echo "" > /home/gpadmin/.ssh/known_hosts
+
+log() {
+  mes=$1
+  echo "init_ssh.sh| $mes" | sudo tee -a /proc/1/fd/1
+}
 
 connect_master_to_segments() {
   host_to_connect=$1
@@ -19,7 +24,7 @@ connect_master_to_segments() {
     scp /home/gpadmin/gpconfigs/hostfile_segments "$host_to_connect":/home/gpadmin/gpconfigs/hostfile_segments
     log "MASTER: Copied file /home/gpadmin/gpconfigs/hostfile_segments to ${host_to_connect}"
 
-    (ssh "${host_to_connect}" 'bash /home/gpadmin/init_ssh.sh < /dev/null' | sudo tee -a /proc/1/fd/1) < /dev/null
+    (ssh "${host_to_connect}" 'bash /home/gpadmin/init_scripts/init_ssh_old.sh < /dev/null' | sudo tee -a /proc/1/fd/1) < /dev/null
     log "MASTER: Executed init_ssh.sh on ${host_to_connect}"
 
     ssh "${host_to_connect}" "ssh -o StrictHostKeyChecking=no ${master_hostname} < /dev/null" < /dev/null
@@ -45,10 +50,6 @@ connect_segment_to_all() {
   fi
 }
 
-log() {
-  mes=$1
-  echo "$mes" | sudo tee -a /proc/1/fd/1
-}
 
 
 

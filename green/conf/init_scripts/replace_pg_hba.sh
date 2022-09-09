@@ -2,7 +2,7 @@
 
 log() {
   mes=$1
-  echo "$mes" | sudo tee -a /proc/1/fd/1
+  echo "replace_pg_hba.sh| $mes" | sudo tee -a /proc/1/fd/1
 }
 
 

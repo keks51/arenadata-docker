@@ -2,14 +2,19 @@
 
 conf_file="/home/gpadmin/gpconfigs/gpinitsystem_config"
 
-echo "MASTER: Overriding variables..." | sudo tee -a /proc/1/fd/1
+log() {
+  mes=$1
+  echo "override_conf.sh| $mes" | sudo tee -a /proc/1/fd/1
+}
+
+log "MASTER: Overriding variables..."
 while IFS='=' read -r -d '' conf_k v; do
     if [[ $conf_k == CONF__* ]]
     then
       k=$(echo "${conf_k//CONF__/}")
-      echo "MASTER: ${k}"
+      log "MASTER: ${k}"
 
-      echo "MASTER: Applying ${k}=${v}" | sudo tee -a /proc/1/fd/1
+      log "MASTER: Applying ${k}=${v}"
       if [[ $k == "DATA_DIRECTORY" ]]; then
         sed -i "/^declare -a DATA_DIRECTORY=/c\declare -a DATA_DIRECTORY=${v}" "$conf_file"
         elif [[ $k == "MIRROR_DATA_DIRECTORY" ]]; then

@@ -34,20 +34,22 @@ RUN sed -ri 's/#PermitRootLogin yes/PermitRootLogin yes/g' /etc/ssh/sshd_config
 # http://stackoverflow.com/questions/18173889/cannot-access-centos-sshd-on-docker
 RUN sed -ri 's/UsePAM yes/#UsePAM yes/g' /etc/ssh/sshd_config
 RUN sed -ri 's/#UsePAM no/UsePAM no/g' /etc/ssh/sshd_config
-COPY ./conf/.ssh /home/gpadmin/.ssh
-RUN ls -l /home/gpadmin/
+COPY ./conf/gpadmin/.ssh /home/gpadmin/.ssh
+COPY ./conf/root/.ssh /root/.ssh
 RUN chmod 700 /home/gpadmin/.ssh && \
 	chmod 600 /home/gpadmin/.ssh/authorized_keys && \
-	chown -R gpadmin:gpadmin /home/gpadmin/.ssh/
+	chown -R gpadmin:gpadmin /home/gpadmin/.ssh/ && \
+    chmod 700 /root/.ssh && \
+    chmod 600 /root/.ssh/authorized_keys
 
 
 
 # Installing GREENPLUM required packages and configuring
-COPY ./conf/sysctl.conf /etc/sysctl.conf
-COPY ./conf/limits.conf /etc/security/limits.conf
-COPY ./conf/20-nproc.conf /etc/security/limits.d/20-nproc.conf
+COPY ./conf/greenplum/sysctl.conf /etc/sysctl.conf
+COPY ./conf/greenplum/limits.conf /etc/security/limits.conf
+COPY ./conf/greenplum/20-nproc.conf /etc/security/limits.d/20-nproc.conf
 RUN chmod +x /etc/rc.d/rc.local
-COPY ./conf/logind.conf /etc/systemd/logind.conf
+COPY ./conf/greenplum/logind.conf /etc/systemd/logind.conf
 RUN bash -c 'echo "%wheel ALL=(ALL)      NOPASSWD: ALL" | (EDITOR="tee -a" visudo)' && \
     bash -c 'echo "gpadmin ALL=(ALL:ALL) NOPASSWD: ALL" | (EDITOR="tee -a" visudo)' && \
     mkdir /home/gpadmin/gpconfigs && \
@@ -56,7 +58,7 @@ RUN bash -c 'echo "%wheel ALL=(ALL)      NOPASSWD: ALL" | (EDITOR="tee -a" visud
     mkdir /data/primary && \
     mkdir /data/mirror && \
     chown -R gpadmin:gpadmin /data/*
-COPY ./conf/gpinitsystem_config /home/gpadmin/gpconfigs/gpinitsystem_config
+COPY ./conf/greenplum/gpinitsystem_config /home/gpadmin/gpconfigs/gpinitsystem_config
 COPY ./open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm /home/gpadmin/
 RUN cd /home/gpadmin/ && \
     yum install -y open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm
@@ -96,23 +98,17 @@ RUN cd /root/pxf_workspace && \
     git checkout tags/release-6.4.0
 RUN source /usr/local/greenplum-db-6.21.2/greenplum_path.sh && \
     make -C /root/pxf_workspace/pxf install
+COPY ./conf/pxf/ /home/gpadmin/pxf/
+RUN mkdir -p /data/extra_pxf/lib && \
+    mkdir -p /data/extra_pxf/servers
 
 
-
-# configuring STARTUP script
-COPY ./conf/start_db.sh /home/gpadmin/start_db.sh
-COPY ./conf/override_conf.sh /home/gpadmin/override_conf.sh
-COPY ./conf/init_ssh.sh /home/gpadmin/init_ssh.sh
-COPY ./conf/start_pxf.sh /home/gpadmin/start_pxf.sh
-COPY ./conf/replace_pg_hba.sh /home/gpadmin/replace_pg_hba.sh
-COPY ./conf/init_script.sh /init_script.sh
+# configuring START script
+COPY ./conf/init_scripts/ /home/gpadmin/init_scripts/
+COPY ./conf/start.sh /start.sh
 COPY ./conf/init_script.service  /lib/systemd/system/init_script.service
-RUN chmod +x /init_script.sh && \
-    chmod +x /home/gpadmin/start_db.sh && \
-    chmod +x /home/gpadmin/override_conf.sh && \
-    chmod +x /home/gpadmin/start_pxf.sh && \
-    chmod +x /home/gpadmin/replace_pg_hba.sh && \
-    chmod +x /home/gpadmin/init_ssh.sh && \
+RUN chmod +x /start.sh && \
+    chmod +x /home/gpadmin/init_scripts/* && \
     chown -R gpadmin:gpadmin /home/gpadmin && \
     systemctl enable init_script.service
 
