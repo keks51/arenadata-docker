@@ -23,7 +23,7 @@ function usage {
 	echo "Pre-requisites:"
 	echo "1. Set environment variables ADCM_USERNAME, ADCM_PASSWORD, ANSIBLE_USERNAME, ANSIBLE_PASSWORD. Example:"
 	echo "    export ADCM_USERNAME=admin"
-	echo "2. Make sure dependencies installed: curl, jq, mktemp"
+	echo "2. Make sure dependencies installed: curl, jq, mktemp, rename"
 	echo "3. Save bundles into 'bundles' subfolder located next to $PROGRAM_NAME"
 	echo "    Bundles required: 'adcm_host_ssh<...>.tgz', 'adcm_cluster_adqm<...>.tgz'"
 	echo "4. Make sure ADCM and target installation hosts are up and running"
@@ -126,6 +126,11 @@ fi
 if ! command -v mktemp &> /dev/null
 then
     echo "'mktemp' could not be found"
+    exit
+fi
+if ! command -v rename &> /dev/null
+then
+    echo "'rename' could not be found"
     exit
 fi
 
