@@ -21,11 +21,11 @@ services:
     hostname: ch2
     privileged: true
     volumes:
-      - ./volume/ch2/data:/var/lib/clickhouse/data/    
+      - ./volume/ch2/data:/var/lib/clickhouse/data/
   ch3:
     image: keks51-centos7
     container_name: ch3
     hostname: ch3
     privileged: true
     volumes:
-      - ./volume/ch3/data:/var/lib/clickhouse/data/    
+      - ./volume/ch3/data:/var/lib/clickhouse/data/
