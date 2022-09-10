@@ -56,5 +56,37 @@ In script itself, volumes/adcm cleaning is hard-coded. So it always removes ADCM
 
 **Important: Script does not clean ClickHouse data volume, but you may need to clean it manually if you restart deployment scripts while *decreasing host count***
 
+## Cluster installer script
+Script name: 'install.sh'. Script waits for ADCM start (no timeout set) and can be started right after ADCM deployment script. 
+### Dependencies
+	
+- Bash (Unix shell)
+- GNU Core Utilities or coreutils 
+- Additional software
+	- curl
+	- jq
+	- mktemp
+	- rename
+- Settings Files (JSON) in any location:
+	- ADCM Settings file ```-- adcm-config <adcm config>.json```
+	- ADQM Settings file ```--adqmdb-config <adqmdb config>.json```
+- Bundle files ```--bundles-location <bundles location directory>```	
+	- SSH Common Bundle https://store.arenadata.io/#products/arenadata_cluster_manager
+	- ADQM Bundle https://store.arenadata.io/#products/arenadata_quickmarts	see "Infrastructure Bundles" section
+- Environment Variables
+	- ADCM_USERNAME and ADCM_PASSWORD
+		<br>```export ADCM_USERNAME=...``` 
+		<br>```export ADCM_PASSWORD=...```
+		<br>ADCM Default Login and password: https://docs.arenadata.io/adcm/user/quick.html
+	- ANSIBLE_USERNAME and ANSIBLE_PASSWORD
+		<br>```export ANSIBLE_USERNAME=root```
+		<br>```export ANSIBLE_PASSWORD=root```
+
+
+#### Tested Versions
+bash-3.2.57(1)-release, curl-7.79.1, jq-1.6, rename-1.601
+
+### Example and step-by-step description
+
 
 

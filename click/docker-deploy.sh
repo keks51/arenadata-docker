@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 echo "Stopping ADCM and node containers ..."
 docker compose stop
