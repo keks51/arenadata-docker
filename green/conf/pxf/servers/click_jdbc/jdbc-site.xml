@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property>
+        <name>jdbc.driver</name>
+        <value>com.clickhouse.jdbc.ClickHouseDriver</value>
+        <description>Class name of the JDBC driver (e.g. org.postgresql.Driver)</description>
+    </property>
+    <property>
+        <name>jdbc.url</name>
+        <value>jdbc:clickhouse://localhost:8123</value>
+        <description>The URL that the JDBC driver can use to connect to the database (e.g. jdbc:postgresql://localhost/postgres)</description>
+    </property>
+    <property>
+        <name>jdbc.user</name>
+        <value>root</value>
+        <description>User name for connecting to the database (e.g. postgres)</description>
+    </property>
+    <property>
+        <name>jdbc.password</name>
+        <value>root</value>
+        <description>Password for connecting to the database (e.g. postgres)</description>
+    </property>
+
+    <!-- Connection Pool properties -->
+    <!-- You can use properties described here: https://github.com/brettwooldridge/HikariCP
+         except for the following ones: dataSourceClassName, jdbcUrl, username, password,
+         dataSource.user, dataSource.password
+    -->
+    <property>
+        <name>jdbc.pool.enabled</name>
+        <value>true</value>
+        <description>Use connection pool for JDBC</description>
+    </property>
+
+    <property>
+        <name>jdbc.pool.property.maximumPoolSize</name>
+        <value>15</value>
+        <description>The maximum number of actual connections to the database backend</description>
+    </property>
+    <property>
+        <name>jdbc.pool.property.connectionTimeout</name>
+        <value>30000</value>
+        <description>The maximum time (in milliseconds) to wait for a connection from the pool</description>
+    </property>
+    <property>
+        <name>jdbc.pool.property.idleTimeout</name>
+        <value>30000</value>
+        <description>The maximum time (in milliseconds) that a connection will sit idle in the pool</description>
+    </property>
+    <property>
+        <name>jdbc.pool.property.minimumIdle</name>
+        <value>0</value>
+        <description>The minimum number of idle connections to maintain in the pool</description>
+    </property>
+
+    <!--
+    <property>
+        <name>jdbc.pool.qualifier</name>
+        <value>${pxf.session.user}</value>
+        <description>
+            A separate connection pool will be created for each value of the given qualifier, even if all other parameters
+            are the same. Might be useful when jdbc.session.property is set to do session authorization to switch users
+            once connected, in which case set it to ${pxf.session.user} so that a separate pool is created for every
+            effective user.
+        </description>
+    </property>
+    -->
+
+    <!-- Statement level properties -->
+    <!--
+    <property>
+        <name>jdbc.statement.writeSize</name>
+        <value>100</value>
+        <description>Number of rows that should be batched prior to writing. Default is 100</description>
+    </property>
+    -->
+    <!--
+    <property>
+        <name>jdbc.statement.fetchSize</name>
+        <value>1000</value>
+        <description>
+            Number of rows that should be fetched at a time during read. Default is 1000 for all drivers other than MySQL.
+            For the MySQL JDBC driver, the default value is set to -2147483648 (Integer.MIN_VALUE) to enable streaming
+            read and avoid bringing the complete ResultSet into PXF memory.
+        </description>
+    </property>
+    -->
+
+    <!-- Transaction isolation level
+         {READ_UNCOMMITTED | READ_COMMITTED | REPEATABLE_READ | SERIALIZABLE} -->
+    <!--
+    <property>
+        <name>jdbc.connection.transactionIsolation</name>
+        <value>YOUR_CHOSEN_TRANSACTION_ISOLATION_FROM_ABOVE</value>
+        <description>JDBC connection transaction isolation level. Make sure your database supports the level you define here</description>
+    </property>
+    -->
+
+    <!-- Session-level properties -->
+    <!--
+    <property>
+        <name>jdbc.session.property.some_property_1</name>
+        <value>some_value_1</value>
+        <description>Session-level variable to set in external database before query execution</description>
+    </property>
+    -->
+    <!--
+    <property>
+        <name>jdbc.session.property.some_property_2</name>
+        <value>some_value_2</value>
+        <description>Session-level variable to set in external database before query execution</description>
+    </property>
+    -->
+
+    <!-- Connection properties -->
+    <!--
+    <property>
+        <name>jdbc.connection.property.some_property_1</name>
+        <value>some_value_1</value>
+        <description>JDBC connection property</description>
+    </property>
+    -->
+    <!--
+    <property>
+        <name>jdbc.connection.property.some_property_2</name>
+        <value>some_value_2</value>
+        <description>JDBC connection property</description>
+    </property>
+    -->
+
+    <!--
+    <property>
+        <name>pxf.service.user.impersonation</name>
+        <value>false</value>
+        <description>Impersonate Greenplum user when connecting to the remote database (previously known as pxf.impersonation.jdbc)</description>
+    </property>
+    -->
+
+    <!--
+    <property>
+        <name>hadoop.security.authentication</name>
+        <value>kerberos</value>
+        <description>When running against a kerberized-hive, this property has to be set to kerberos for the server configuration.</description>
+    </property>
+    -->
+
+    <!--
+    <property>
+        <name>jdbc.read.prepared-statement</name>
+        <value>false</value>
+        <description>
+            Use a PreparedStatement instead of a Statement when reading from the external data source. This may be
+            required to enable certain features of the JDBC driver or external data source; for example, Teradata's
+            FastExport requires the use of a PreparedStatement.
+        </description>
+    </property>
+    -->
+
+</configuration>

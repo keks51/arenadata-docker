@@ -13,6 +13,8 @@ services:
     container_name: ch1
     hostname: ch1
     privileged: true
+    ports:
+      - "8123:8123"
     volumes:
       - ./volume/ch1/ch:/var/lib/clickhouse/
   ch2:
