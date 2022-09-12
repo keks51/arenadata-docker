@@ -7,8 +7,7 @@ PROGRAM_VERSION="0.1"
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
 
-# Hostprovider name to be defined by this script
-HOSTPROVIDER_NAME="HostProvider0"
+HOSTPROVIDER_PREFIX="HostProvider for " # + CLUSTER_NAME concatenated
 
 # Zookeper service has some specific installation logic.
 # To make Zookeper operating it should always uneven cluster host count.
@@ -75,7 +74,7 @@ while true; do
                         BUNDLES_LOCATION="$2"; shift; shift; continue
                 ;;
                 -c|--cluster-name)
-                        CLUSTER_NAME="$2"; shift; shift; continue
+                        CLUSTER_NAME="$2"; HOSTPROVIDER_NAME="$HOSTPROVIDER_PREFIX$2"; shift; shift; continue
                 ;;
                 -t|--target-hosts)
                         HOSTS=("${2}"); shift; shift; continue
