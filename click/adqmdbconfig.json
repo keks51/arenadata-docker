@@ -63,7 +63,7 @@
       "access_control_path": "/var/lib/clickhouse/access/"
     },
     "Cluster_configuration": {
-      "replication_factor": 2,
+      "replication_factor": 1,
       "cluster_topology": "{}",
       "cluster_config": {
         "cluster": []

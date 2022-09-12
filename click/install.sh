@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 PROGRAM_NAME=$(basename $0)
 PROGRAM_VERSION="0.1"
@@ -7,13 +7,16 @@ PROGRAM_VERSION="0.1"
 BUNDLE_NAME_SSH_COMMON="SSH Common"
 BUNDLE_NAME_ADQM="ADQM"
 
-# Hostprovider name to be defined by this script
-HOSTPROVIDER_NAME="HostProvider0"
+HOSTPROVIDER_PREFIX="HostProvider for " # + CLUSTER_NAME concatenated
 
+# Zookeper service has some specific installation logic.
+# To make Zookeper operating it should always uneven cluster host count.
+# If target host count is even, Zookeper is not installed to the last host.
+SERVICE_NAME_ZOOKEEPER="zookeeper"
 # Services to install. 
 # ADQMDB includes 2 components - ClickHouse Server and ClickHouse JDBC bridge
 # Zookeper contains only one component - Zookeeper Server
-SERVICE_NAMES=("adqmdb" "zookeeper")
+SERVICE_NAMES=("adqmdb" $SERVICE_NAME_ZOOKEEPER)
 
 set -e
 
@@ -23,7 +26,7 @@ function usage {
 	echo "Pre-requisites:"
 	echo "1. Set environment variables ADCM_USERNAME, ADCM_PASSWORD, ANSIBLE_USERNAME, ANSIBLE_PASSWORD. Example:"
 	echo "    export ADCM_USERNAME=admin"
-	echo "2. Make sure dependencies installed: curl, jq, mktemp"
+	echo "2. Make sure dependencies installed: curl, jq, mktemp, rename"
 	echo "3. Save bundles into 'bundles' subfolder located next to $PROGRAM_NAME"
 	echo "    Bundles required: 'adcm_host_ssh<...>.tgz', 'adcm_cluster_adqm<...>.tgz'"
 	echo "4. Make sure ADCM and target installation hosts are up and running"
@@ -71,7 +74,7 @@ while true; do
                         BUNDLES_LOCATION="$2"; shift; shift; continue
                 ;;
                 -c|--cluster-name)
-                        CLUSTER_NAME="$2"; shift; shift; continue
+                        CLUSTER_NAME="$2"; HOSTPROVIDER_NAME="$HOSTPROVIDER_PREFIX$2"; shift; shift; continue
                 ;;
                 -t|--target-hosts)
                         HOSTS=("${2}"); shift; shift; continue
@@ -126,6 +129,11 @@ fi
 if ! command -v mktemp &> /dev/null
 then
     echo "'mktemp' could not be found"
+    exit
+fi
+if ! command -v rename &> /dev/null
+then
+    echo "'rename' could not be found"
     exit
 fi
 
@@ -445,18 +453,31 @@ hostComponentJson=$(curl --silent \
 	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/?view=interface")
 componentIds=($(echo $hostComponentJson | jq -r '.component | .[].id'))
 serviceIds=($(echo $hostComponentJson | jq -r '.component | .[].service_id'))
+serviceNames=($(echo $hostComponentJson | jq -r '.component | .[].service_name'))
 hostIds=($(echo $hostComponentJson | jq -r '.host | .[].id'))
+hostCount=${#hostIds[@]}
+last=${hostIds[$hostCount - 1]}
 hcJsonObjectsArray=()
 # 3 components available for 2 installed services (SERVICE_NAMES)
 for i in 0 1 2
 do
 	componentId=${componentIds[i]}
 	serviceId=${serviceIds[i]}
+	serviceName=${serviceNames[i]}
 	# map all 3 components to all N hosts
-	for hostId in ${hostIds[@]};
-	do
+	for hostId in "${hostIds[@]}"
+	do 
+	  # if host count is event AND service is Zookeper, then don't install to the last host
+	  if [[ $((hostCount%2)) == 0 && $SERVICE_NAME_ZOOKEEPER == $serviceName && $hostId == $last ]]
+	  then
+	     printf "Not mapping component id=%s service_id=%s service_name='%s' to the last target host id=%s \n" \
+	     	$componentId $serviceId $serviceName $hostId
+	  else 
+	  	printf "Mapping component id=%s service_id=%s service_name='%s' to target host id=%s \n" \
+	  		$componentId $serviceId $serviceName $hostId
 		hcJsonObjectsArray+=("{\"host_id\":$hostId, \"service_id\":$serviceId, \"component_id\":$componentId}")
-	done
+	  fi 
+	done 
 done
 hcJsonObjectsString=$(IFS=,\n;printf  "%s" "${hcJsonObjectsArray[*]}")
 mappingJson="{
@@ -471,10 +492,11 @@ curl --silent \
 	--header "Authorization: Token $token" \
 	-X POST \
 	--data "$mappingJson" \
-	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/" 2>&1 1>/dev/null
+	"$ADCM_ADDRESS/api/v1/cluster/$clusterId/hostcomponent/"
 
 ############
 #  4 . Cluster Installation
+echo
 echo "[phase 4] Cluster Installation"
 ############
 actionId=$(curl --silent \
