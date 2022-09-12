@@ -496,7 +496,8 @@ curl --silent \
 
 ############
 #  4 . Cluster Installation
-echo "\n[phase 4] Cluster Installation"
+echo
+echo "[phase 4] Cluster Installation"
 ############
 actionId=$(curl --silent \
 	--header "Accept:application/json" \
