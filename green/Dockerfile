@@ -38,9 +38,13 @@ COPY ./conf/gpadmin/.ssh /home/gpadmin/.ssh
 COPY ./conf/root/.ssh /root/.ssh
 RUN chmod 700 /home/gpadmin/.ssh && \
 	chmod 600 /home/gpadmin/.ssh/authorized_keys && \
+	chmod 600 /home/gpadmin/.ssh/id_rsa && \
+	chmod 644 /home/gpadmin/.ssh/id_rsa.pub && \
 	chown -R gpadmin:gpadmin /home/gpadmin/.ssh/ && \
     chmod 700 /root/.ssh && \
-    chmod 600 /root/.ssh/authorized_keys
+    chmod 600 /root/.ssh/authorized_keys && \
+    chmod 600 /root/.ssh/id_rsa && \
+    chmod 644 /root/.ssh/id_rsa.pub
 
 
 
