@@ -14,10 +14,10 @@ master_hostname=$(hostname)
 log "MASTER: Segments are ${SEGMENT_HOSTNAMES}"
 
 if [ -d "$master_data_dir" ]; then
-  log "MASTER: Master host data directory ${master_data_dir} already exists. Skipping init step"
+  log "MASTER: Master host data directory ${master_data_dir} already exists. Skipping init database step"
   gpstart -a -d "$master_data_dir" | sudo tee -a /proc/1/fd/1
 else
-  log "MASTER: Master host data directory ${master_data_dir} doesn't exists. Running init script"
+  log "MASTER: Master host data directory ${master_data_dir} doesn't exists. Running init database step"
   if [ -n "$STANDBY_HOSTNAME"  ] && [ -n "$STANDBY_PORT"  ]; then
     standby_data_dir=${STANDBY_DIRECTORY:-/data/master}
     log "MASTER: Starting Master HOST: ${master_hostname}, PORT: ${master_port}, MASTER DATA DIR: ${master_data_dir}"
@@ -39,6 +39,8 @@ else
            | sudo tee -a /proc/1/fd/1
 
   fi
+  echo 'host    all             all             0.0.0.0/0            trust' >> "${master_data_dir}/pg_hba.conf"
+  gpstop -u -d "${master_data_dir}"
   log "MASTER: Creating default db 'gpadmin'"
   createdb -h "$master_hostname" -p "$master_port" gpadmin | sudo tee -a /proc/1/fd/1
 fi

@@ -4,6 +4,8 @@ FROM centos/systemd
 # Installing not required packages
 RUN yum -y install \
     telnet \
+    nmap \
+    htop \
     vim
 
 
@@ -61,7 +63,7 @@ RUN bash -c 'echo "%wheel ALL=(ALL)      NOPASSWD: ALL" | (EDITOR="tee -a" visud
     mkdir -p /data/master && \
     mkdir /data/primary && \
     mkdir /data/mirror && \
-    chown -R gpadmin:gpadmin /data/*
+    chown -R gpadmin:gpadmin /data
 COPY ./conf/greenplum/gpinitsystem_config /home/gpadmin/gpconfigs/gpinitsystem_config
 COPY ./open-source-greenplum-db-6.21.2-rhel7-x86_64.rpm /home/gpadmin/
 RUN cd /home/gpadmin/ && \
@@ -105,6 +107,14 @@ RUN source /usr/local/greenplum-db-6.21.2/greenplum_path.sh && \
 COPY ./conf/pxf/ /home/gpadmin/pxf/
 RUN mkdir -p /data/extra_pxf/lib && \
     mkdir -p /data/extra_pxf/servers
+
+
+
+# installing clickhouse client for jdbc connection which use tcp
+RUN yum-config-manager --add-repo https://packages.clickhouse.com/rpm/clickhouse.repo
+RUN yum install -y clickhouse-client
+RUN echo 'export CHC_CLICKHOUSE_CLI_PATH=/usr/bin/clickhouse' >> /home/gpadmin/.bashrc
+
 
 
 # configuring START script

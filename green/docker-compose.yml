@@ -29,6 +29,8 @@ services:
       - START_PXF=true
     volumes:
       - ./volume/mdw/:/data/
+    ports:
+      - "5432:5432"
   mdw-standby:
     image: keks51-green
     container_name: mdw-standby
